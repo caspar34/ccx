@@ -1523,7 +1523,11 @@ a.api-type-text {
   }
 
   .api-type-text {
-    padding: 2px 6px;
+    padding: 2px 4px;
+  }
+
+  .separator {
+    margin: 0 0;
   }
 
   .api-type-text.active {
