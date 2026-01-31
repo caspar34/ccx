@@ -1,6 +1,6 @@
 module github.com/BenedictKing/ccx
 
-go 1.22
+go 1.25
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
