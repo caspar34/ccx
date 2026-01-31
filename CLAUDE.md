@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Claude / Codex / Gemini API Proxy - 支持多上游 AI 服务的协议转换代理，提供 Web 管理界面和统一 API 入口。
 
-**技术栈**: Go 1.22 (后端) + Vue 3 + Vuetify (前端) + Docker
+**技术栈**: Go 1.25 (后端) + Vue 3 + Vuetify (前端) + Docker
 
 ## 常用命令
 

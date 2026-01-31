@@ -17,7 +17,7 @@
     <!-- 认证界面 -->
     <v-dialog v-model="showAuthDialog" persistent max-width="500">
       <v-card class="pa-4">
-        <v-card-title class="text-h5 text-center mb-4"> 🔐 CCX 管理界面 </v-card-title>
+        <v-card-title class="text-h5 text-center mb-4"> 🔐 API Proxy - CCX </v-card-title>
 
         <v-card-text>
           <v-alert v-if="authStore.authError" type="error" variant="tonal" class="mb-4">
@@ -63,9 +63,9 @@
     <!-- 应用栏 - 毛玻璃效果 -->
     <v-app-bar elevation="0" :height="$vuetify.display.mobile ? 56 : 72" class="app-header">
       <template #prepend>
-        <div class="app-logo">
+        <a href="https://github.com/BenedictKing/ccx" target="_blank" rel="noopener noreferrer" class="app-logo">
           <v-icon :size="$vuetify.display.mobile ? 22 : 32" color="white"> mdi-rocket-launch </v-icon>
-        </div>
+        </a>
       </template>
 
       <!-- 自定义标题容器 - 替代 v-app-bar-title -->
@@ -82,7 +82,7 @@
           <router-link to="/channels/gemini" class="api-type-text" :class="{ active: channelStore.activeTab === 'gemini' }">
             Gemini
           </router-link>
-          <span class="brand-text d-none d-sm-inline">CCX</span>
+          <span class="brand-text d-none d-sm-inline">API Proxy - CCX</span>
         </div>
       </div>
 

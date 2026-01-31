@@ -1,6 +1,6 @@
-# 项目架构与设计
+# Claude / Codex / Gemini API Proxy - CCX
 
-本文档详细介绍 Claude / Codex / Gemini API Proxy 的架构设计、技术选型和实现细节。
+本文档详细介绍 Claude / Codex / Gemini API Proxy - CCX 的架构设计、技术选型和实现细节。
 
 ## 项目结构
 
@@ -39,7 +39,7 @@ ccx/
 
 ### 后端 (backend-go/)
 
-- **运行时**: Go 1.22+
+- **运行时**: Go 1.25+
 - **框架**: Gin Web Framework
 - **配置管理**: fsnotify (热重载) + godotenv
 - **前端嵌入**: Go `embed.FS`

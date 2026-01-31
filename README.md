@@ -1,4 +1,4 @@
-# Claude / Codex / Gemini API Proxy (CCX)
+# Claude / Codex / Gemini API Proxy - CCX
 
 [![GitHub release](https://img.shields.io/github/v/release/BenedictKing/ccx)](https://github.com/BenedictKing/ccx/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
