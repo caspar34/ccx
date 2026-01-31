@@ -12,7 +12,7 @@ Claude / Codex / Gemini API Proxy - 支持多上游 AI 服务的协议转换代�
 
 ```bash
 # 根目录（推荐）
-make dev              # Go 后端热重载开发（不含前端）
+make dev              # 同时启动前后端开发模式（热重载）
 make run              # 构建前端并运行 Go 后端
 make frontend-dev     # 前端开发服务器
 make build            # 构建前端并编译 Go 后端

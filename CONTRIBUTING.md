@@ -27,10 +27,10 @@
 1.  **准备工作**:
     *   确保本地 `main` 分支是最新的。
     *   确认所有计划内的功能和修复已合并。
-    *   运行类型检查 (`bun run type-check`) 和构建验证 (`bun run build`)。
+    *   运行测试和构建验证：`cd backend-go && make test && cd .. && make build`
 2.  **更新日志**: 更新 `CHANGELOG.md`，新增版本标题，并分类记录变更内容。
-3.  **更新版本号**: 更新 `package.json` 中的 `version` 字段。
-4.  **提交**: 提交 `CHANGELOG.md` 和 `package.json` 的修改，提交信息格式为 `chore(release): prepare for vX.Y.Z`。
+3.  **更新版本号**: 更新根目录 `VERSION` 文件。
+4.  **提交**: 提交 `CHANGELOG.md` 和 `VERSION` 的修改，提交信息格式为 `chore(release): prepare for vX.Y.Z`。
 5.  **创建标签**: 为此次提交创建附注标签 `git tag -a vX.Y.Z -m "Release vX.Y.Z"` 并推送到远程。
 6.  **GitHub Release**: 在 GitHub 上创建 Release，将 `CHANGELOG.md` 中的对应版本内容复制到发布说明中。
 
@@ -47,36 +47,63 @@
 
 ### 代码质量标准
 
--   使用 TypeScript 严格模式，避免 `any` 类型。
--   所有函数都有明确的类型声明。
--   实现优雅的错误处理和日志记录。
--   遵循 Prettier 格式化（2空格、单引号、无分号、宽度120、LF EOL）。
+**Go 后端 (backend-go/)**:
+-   使用 `go fmt` 格式化代码
+-   使用 `golangci-lint` 进行代码检查
+-   日志使用 `[Component-Action]` 标签格式，禁止 emoji
+-   实现优雅的错误处理和日志记录
+
+**Vue 前端 (frontend/)**:
+-   使用 TypeScript 严格模式，避免 `any` 类型
+-   所有函数都有明确的类型声明
+-   遵循 Prettier 格式化（2空格、单引号、无分号、宽度120、LF EOL）
 
 ### 文件命名规范
 
--   **文件名**: `kebab-case` (例: `config-manager.ts`)
--   **类名**: `PascalCase` (例: `ConfigManager`)
+**Go 后端**:
+-   **文件名**: `snake_case` (例: `channel_scheduler.go`)
+-   **类型/接口名**: `PascalCase` (例: `Provider`)
+-   **函数名**: `PascalCase` 导出 / `camelCase` 私有
+-   **常量名**: `PascalCase` 或 `SCREAMING_SNAKE_CASE`
+
+**Vue 前端**:
+-   **文件名**: `kebab-case` (例: `api-service.ts`)
 -   **Vue 组件名**: `PascalCase` (例: `ChannelCard.vue`)
 -   **类型/接口名**: `PascalCase`
 -   **函数名**: `camelCase` (例: `getNextApiKey`)
 -   **常量名**: `SCREAMING_SNAKE_CASE` (例: `DEFAULT_CONFIG`)
 
-### TypeScript 规范
+### TypeScript 规范（前端）
 
--   使用严格的 TypeScript 配置。
--   所有函数和变量都有明确的类型声明。
--   使用接口定义数据结构。
--   避免使用 `any` 类型。
+-   使用严格的 TypeScript 配置
+-   所有函数和变量都有明确的类型声明
+-   使用接口定义数据结构
+-   避免使用 `any` 类型
+
+### Go 规范（后端）
+
+-   使用 `go fmt` 格式化，`golangci-lint` 检查
+-   错误必须显式处理，不可忽略
+-   使用接口定义抽象，便于测试和扩展
+-   日志使用 `[Component-Action]` 标签格式
 
 ## 测试指南
 
 ### 开发测试
 
 在提交代码前，请确保：
--   运行 TypeScript 类型检查：`bun run type-check`
--   运行构建验证：`bun run build`
--   通过健康检查端点 (`GET http://localhost:3000/health`) 进行冒烟测试。
--   对于 UI 变更，在 Pull Request 中包含简短的测试计划和截图/GIF。
+
+**Go 后端**:
+-   运行测试：`cd backend-go && make test`
+-   运行代码检查：`cd backend-go && make lint`
+-   运行格式化：`cd backend-go && make fmt`
+
+**Vue 前端**:
+-   运行构建验证：`cd frontend && bun run build`
+
+**集成验证**:
+-   通过健康检查端点 (`GET http://localhost:3000/health`) 进行冒烟测试
+-   对于 UI 变更，在 Pull Request 中包含简短的测试计划和截图/GIF
 
 ### 提交与 Pull Request 指南
 
@@ -91,7 +118,7 @@
 
 ## 安全与配置提示
 
--   **切勿提交敏感信息**: 永远不要将密钥或敏感配置提交到版本控制中。使用 `.env` 文件和 `backend/config.json` 进行管理。
+-   **切勿提交敏感信息**: 永远不要将密钥或敏感配置提交到版本控制中。使用 `.env` 文件和 `backend-go/.config/config.json` 进行管理。
 -   **访问密钥**: `PROXY_ACCESS_KEY` 是代理访问的必需密钥。避免在日志中记录完整的 API 密钥。
 
 ## Agent-Specific Notes
