@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BenedictKing/claude-proxy/internal/config"
+	"github.com/BenedictKing/ccx/internal/config"
 )
 
 // ClientManager HTTP 客户端管理器

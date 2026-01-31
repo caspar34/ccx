@@ -3,9 +3,9 @@ package gemini
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/BenedictKing/claude-proxy/internal/config"
-	"github.com/BenedictKing/claude-proxy/internal/metrics"
-	"github.com/BenedictKing/claude-proxy/internal/scheduler"
+	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/metrics"
+	"github.com/BenedictKing/ccx/internal/scheduler"
 )
 
 // GetDashboard 获取 Gemini 渠道仪表盘数据（合并 channels + metrics + stats + recentActivity）

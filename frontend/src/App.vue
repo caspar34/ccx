@@ -17,7 +17,7 @@
     <!-- 认证界面 -->
     <v-dialog v-model="showAuthDialog" persistent max-width="500">
       <v-card class="pa-4">
-        <v-card-title class="text-h5 text-center mb-4"> 🔐 Claude Proxy 管理界面 </v-card-title>
+        <v-card-title class="text-h5 text-center mb-4"> 🔐 CCX 管理界面 </v-card-title>
 
         <v-card-text>
           <v-alert v-if="authStore.authError" type="error" variant="tonal" class="mb-4">
@@ -82,7 +82,7 @@
           <router-link to="/channels/gemini" class="api-type-text" :class="{ active: channelStore.activeTab === 'gemini' }">
             Gemini
           </router-link>
-          <span class="brand-text d-none d-sm-inline">API Proxy</span>
+          <span class="brand-text d-none d-sm-inline">CCX</span>
         </div>
       </div>
 

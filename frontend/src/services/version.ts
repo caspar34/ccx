@@ -3,7 +3,7 @@
  * 参考 gpt-load 项目实现
  */
 
-const CACHE_KEY = 'claude-proxy-version-info'
+const CACHE_KEY = 'ccx-version-info'
 const CACHE_DURATION = 30 * 60 * 1000 // 30分钟缓存
 const ERROR_CACHE_DURATION = 5 * 60 * 1000 // 错误状态缓存5分钟，避免频繁请求
 const GITHUB_API_TIMEOUT = 10000 // 10秒超时
@@ -142,7 +142,7 @@ class VersionService {
 
       // 使用 /releases 端点获取最近的发布列表，然后过滤出第一个正式版本
       const response = await fetch(
-        'https://api.github.com/repos/BenedictKing/claude-proxy/releases?per_page=10',
+        'https://api.github.com/repos/BenedictKing/ccx/releases?per_page=10',
         {
           headers: {
             Accept: 'application/vnd.github.v3+json',

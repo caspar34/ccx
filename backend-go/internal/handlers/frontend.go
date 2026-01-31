@@ -142,7 +142,7 @@ func getErrorPage() string {
 	return `<!DOCTYPE html>
 <html>
 <head>
-  <title>Claude Proxy - 配置错误</title>
+  <title>CCX - 配置错误</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>

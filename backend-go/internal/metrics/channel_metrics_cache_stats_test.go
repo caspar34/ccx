@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/BenedictKing/claude-proxy/internal/types"
+	"github.com/BenedictKing/ccx/internal/types"
 )
 
 func TestToResponse_TimeWindowsIncludesCacheStats(t *testing.T) {

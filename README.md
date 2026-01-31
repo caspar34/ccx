@@ -1,6 +1,6 @@
-# Claude / Codex / Gemini API Proxy
+# Claude / Codex / Gemini API Proxy (CCX)
 
-[![GitHub release](https://img.shields.io/github/v/release/BenedictKing/claude-proxy)](https://github.com/BenedictKing/claude-proxy/releases/latest)
+[![GitHub release](https://img.shields.io/github/v/release/BenedictKing/ccx)](https://github.com/BenedictKing/ccx/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 一个高性能的 Claude API 代理服务器，支持多种上游 AI 服务提供商（Claude、Codex、Gemini），提供故障转移、多 API 密钥管理和统一入口访问。
@@ -88,26 +88,26 @@
 
 **无需安装任何依赖，下载即用**
 
-前往 [Releases 页面](https://github.com/BenedictKing/claude-proxy/releases/latest) 下载适合您系统的版本：
+前往 [Releases 页面](https://github.com/BenedictKing/ccx/releases/latest) 下载适合您系统的版本：
 
 | 操作系统 | 架构 | 文件名 |
 |---------|------|--------|
-| **Windows** | x64 | `claude-proxy-windows-amd64.exe` |
-| **Windows** | ARM64 | `claude-proxy-windows-arm64.exe` |
-| **macOS** | Intel | `claude-proxy-darwin-amd64` |
-| **macOS** | Apple Silicon | `claude-proxy-darwin-arm64` |
-| **Linux** | x64 | `claude-proxy-linux-amd64` |
-| **Linux** | ARM64 | `claude-proxy-linux-arm64` |
+| **Windows** | x64 | `ccx-windows-amd64.exe` |
+| **Windows** | ARM64 | `ccx-windows-arm64.exe` |
+| **macOS** | Intel | `ccx-darwin-amd64` |
+| **macOS** | Apple Silicon | `ccx-darwin-arm64` |
+| **Linux** | x64 | `ccx-linux-amd64` |
+| **Linux** | ARM64 | `ccx-linux-arm64` |
 
 **快速启动：**
 
 ```bash
 # Linux / macOS
-chmod +x claude-proxy-*
-./claude-proxy-linux-amd64  # 或对应的文件名
+chmod +x ccx-*
+./ccx-linux-amd64  # 或对应的文件名
 
 # Windows (PowerShell)
-.\claude-proxy-windows-amd64.exe
+.\ccx-windows-amd64.exe
 ```
 
 **配置方式：**
@@ -130,19 +130,19 @@ ENABLE_WEB_UI=true
 ```bash
 # 直接拉取预构建镜像并运行
 docker run -d \
-  --name claude-proxy \
+  --name ccx \
   -p 3000:3000 \
   -e PROXY_ACCESS_KEY=your-super-strong-secret-key \
   -v $(pwd)/.config:/app/.config \
-  crpi-i19l8zl0ugidq97v.cn-hangzhou.personal.cr.aliyuncs.com/bene/claude-proxy:latest
+  crpi-i19l8zl0ugidq97v.cn-hangzhou.personal.cr.aliyuncs.com/bene/ccx:latest
 ```
 
 或使用 docker-compose：
 
 ```bash
 # 1. 克隆项目（仅需 docker-compose.yml）
-git clone https://github.com/BenedictKing/claude-proxy
-cd claude-proxy
+git clone https://github.com/BenedictKing/ccx
+cd ccx
 
 # 2. 修改 docker-compose.yml 中的 PROXY_ACCESS_KEY
 
@@ -166,8 +166,8 @@ docker-compose up -d
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/BenedictKing/claude-proxy
-cd claude-proxy
+git clone https://github.com/BenedictKing/ccx
+cd ccx
 
 # 2. 配置环境变量
 cp backend-go/.env.example backend-go/.env
@@ -200,7 +200,7 @@ make help          # 查看所有可用命令
 预构建镜像托管在阿里云容器镜像服务：
 
 ```
-crpi-i19l8zl0ugidq97v.cn-hangzhou.personal.cr.aliyuncs.com/bene/claude-proxy:latest
+crpi-i19l8zl0ugidq97v.cn-hangzhou.personal.cr.aliyuncs.com/bene/ccx:latest
 ```
 
 支持 `linux/amd64` 和 `linux/arm64` 架构。
@@ -212,11 +212,11 @@ crpi-i19l8zl0ugidq97v.cn-hangzhou.personal.cr.aliyuncs.com/bene/claude-proxy:lat
 ```yaml
 # docker-compose.yml
 services:
-  claude-proxy:
+  ccx:
     build:
       context: .
       dockerfile: Dockerfile  # 国内网络使用 Dockerfile_China
-    container_name: claude-proxy
+    container_name: ccx
     ports:
       - '3000:3000' # 统一端口
     environment:
@@ -340,7 +340,7 @@ echo "新密钥: $NEW_PROXY_ACCESS_KEY"
 export PROXY_ACCESS_KEY=$NEW_PROXY_ACCESS_KEY
 
 # 重启服务
-docker-compose restart claude-proxy
+docker-compose restart ccx
 ```
 
 ## 📖 API 使用
@@ -640,10 +640,10 @@ GET /health
 ```bash
 # Docker 容器状态
 docker-compose ps
-docker-compose logs -f claude-proxy
+docker-compose logs -f ccx
 
 # 性能监控
-docker stats claude-proxy
+docker stats ccx
 
 # 存储使用
 du -sh .config/ logs/
@@ -675,7 +675,7 @@ ENABLE_RESPONSE_LOGS=true  # 记录响应日志
 
    ```bash
    # 检查日志
-   docker-compose logs claude-proxy
+   docker-compose logs ccx
 
    # 检查端口占用
    lsof -i :3000
@@ -690,7 +690,7 @@ ENABLE_RESPONSE_LOGS=true  # 记录响应日志
    ```bash
    # 方案1: 重新构建（推荐）
    make build-current
-   cd backend-go && ./dist/claude-proxy
+   cd backend-go && ./dist/ccx
 
    # 方案2: 验证构建产物是否存在
    ls -la frontend/dist/index.html
@@ -705,10 +705,10 @@ ENABLE_RESPONSE_LOGS=true  # 记录响应日志
 
    ```bash
    # 检查 ENABLE_WEB_UI 设置
-   docker-compose exec claude-proxy printenv ENABLE_WEB_UI
+   docker-compose exec ccx printenv ENABLE_WEB_UI
 
    # 检查文件路径（Docker内部会自动复制到正确位置）
-   docker-compose exec claude-proxy ls -la /app/frontend/dist/
+   docker-compose exec ccx ls -la /app/frontend/dist/
 
    # 重新构建镜像
    docker-compose build --no-cache

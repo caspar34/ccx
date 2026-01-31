@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BenedictKing/claude-proxy/internal/config"
+	"github.com/BenedictKing/ccx/internal/config"
 )
 
 // buildOpenAIURL 模拟 openai.go 中的 URL 构建逻辑

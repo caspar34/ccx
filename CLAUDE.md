@@ -40,7 +40,7 @@ bun run build                 # 生产构建
 ## 架构概览
 
 ```
-claude-proxy/
+ccx/
 ├── backend-go/                 # Go 后端（主程序）
 │   ├── main.go                # 入口、路由配置
 │   └── internal/

@@ -50,12 +50,12 @@ jobs:
         run: |
           go mod tidy
           go mod download
-          CGO_ENABLED=0 go build -ldflags "-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${{ github.sha }}" -o claude-proxy-windows-amd64.exe
+          CGO_ENABLED=0 go build -ldflags "-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${{ github.sha }}" -o ccx-windows-amd64.exe
         working-directory: ./backend-go
 
       - name: Build Backend arm64
         run: |
-          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${{ github.sha }}" -o claude-proxy-windows-arm64.exe
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "-s -w -X main.Version=${{ github.ref_name }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${{ github.sha }}" -o ccx-windows-arm64.exe
         working-directory: ./backend-go
 
       - name: Release
@@ -63,8 +63,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            backend-go/claude-proxy-windows-amd64.exe
-            backend-go/claude-proxy-windows-arm64.exe
+            backend-go/ccx-windows-amd64.exe
+            backend-go/ccx-windows-arm64.exe
           draft: true
           generate_release_notes: true
         env:

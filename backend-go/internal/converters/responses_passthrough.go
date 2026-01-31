@@ -1,8 +1,8 @@
 package converters
 
 import (
-	"github.com/BenedictKing/claude-proxy/internal/session"
-	"github.com/BenedictKing/claude-proxy/internal/types"
+	"github.com/BenedictKing/ccx/internal/session"
+	"github.com/BenedictKing/ccx/internal/types"
 )
 
 // ============== Responses 透传转换器 ==============

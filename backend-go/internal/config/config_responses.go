@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BenedictKing/claude-proxy/internal/utils"
+	"github.com/BenedictKing/ccx/internal/utils"
 )
 
 // ============== Responses 渠道方法 ==============

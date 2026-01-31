@@ -7,7 +7,7 @@
 项目采用一体化架构，Go 后端嵌入前端构建产物，实现单二进制部署：
 
 ```
-claude-proxy/
+ccx/
 ├── backend-go/              # Go 后端服务（主程序）
 │   ├── main.go             # 程序入口
 │   ├── internal/           # 内部实现

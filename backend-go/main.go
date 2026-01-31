@@ -11,17 +11,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/BenedictKing/claude-proxy/internal/config"
-	"github.com/BenedictKing/claude-proxy/internal/handlers"
-	"github.com/BenedictKing/claude-proxy/internal/handlers/gemini"
-	"github.com/BenedictKing/claude-proxy/internal/handlers/messages"
-	"github.com/BenedictKing/claude-proxy/internal/handlers/responses"
-	"github.com/BenedictKing/claude-proxy/internal/logger"
-	"github.com/BenedictKing/claude-proxy/internal/metrics"
-	"github.com/BenedictKing/claude-proxy/internal/middleware"
-	"github.com/BenedictKing/claude-proxy/internal/scheduler"
-	"github.com/BenedictKing/claude-proxy/internal/session"
-	"github.com/BenedictKing/claude-proxy/internal/warmup"
+	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/handlers"
+	"github.com/BenedictKing/ccx/internal/handlers/gemini"
+	"github.com/BenedictKing/ccx/internal/handlers/messages"
+	"github.com/BenedictKing/ccx/internal/handlers/responses"
+	"github.com/BenedictKing/ccx/internal/logger"
+	"github.com/BenedictKing/ccx/internal/metrics"
+	"github.com/BenedictKing/ccx/internal/middleware"
+	"github.com/BenedictKing/ccx/internal/scheduler"
+	"github.com/BenedictKing/ccx/internal/session"
+	"github.com/BenedictKing/ccx/internal/warmup"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -235,7 +235,7 @@ func main() {
 		// 纯 API 模式
 		r.GET("/", func(c *gin.Context) {
 			c.JSON(200, gin.H{
-				"name":    "Claude API Proxy",
+				"name":    "CCX API Proxy",
 				"mode":    "API Only",
 				"version": "1.0.0",
 				"endpoints": gin.H{
@@ -250,7 +250,7 @@ func main() {
 
 	// 启动服务器
 	addr := fmt.Sprintf(":%d", envCfg.Port)
-	fmt.Printf("\n[Server-Startup] Claude API代理服务器已启动\n")
+	fmt.Printf("\n[Server-Startup] CCX API代理服务器已启动\n")
 	fmt.Printf("[Server-Info] 版本: %s\n", Version)
 	if BuildTime != "unknown" {
 		fmt.Printf("[Server-Info] 构建时间: %s\n", BuildTime)

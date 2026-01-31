@@ -113,7 +113,7 @@ cd backend-go
 air
 
 # 替代 make build
-go build -o claude-proxy.exe .
+go build -o ccx.exe .
 
 # 替代 make run
 go run main.go
@@ -182,8 +182,8 @@ git --version   # 应显示 git 版本
 
 ```powershell
 # 1. 克隆项目
-git clone https://github.com/BenedictKing/claude-proxy
-cd claude-proxy
+git clone https://github.com/BenedictKing/ccx
+cd ccx
 
 # 2. 安装前端依赖
 cd frontend
@@ -228,7 +228,7 @@ taskkill /PID <PID> /F
 
 #### 路径包含空格
 
-确保项目路径不包含空格和中文字符，推荐使用如 `C:\projects\claude-proxy` 这样的路径。
+确保项目路径不包含空格和中文字符，推荐使用如 `C:\projects\ccx` 这样的路径。
 
 ---
 
@@ -498,8 +498,8 @@ telnet localhost 3000
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/BenedictKing/claude-proxy
-cd claude-proxy
+git clone https://github.com/BenedictKing/ccx
+cd ccx
 
 # 2. 配置环境变量
 cp backend-go/.env.example backend-go/.env
@@ -520,7 +520,7 @@ cp backend-go/.env.example backend-go/.env
 # 修改 ENV=production 和 PROXY_ACCESS_KEY
 
 # 3. 运行服务
-./backend-go/dist/claude-proxy
+./backend-go/dist/ccx
 ```
 
 ### Docker 部署

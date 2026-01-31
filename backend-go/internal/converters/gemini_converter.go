@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/BenedictKing/claude-proxy/internal/types"
+	"github.com/BenedictKing/ccx/internal/types"
 )
 
 // ============== Gemini -> Claude/OpenAI 转换器 ==============

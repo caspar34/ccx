@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/BenedictKing/claude-proxy/internal/types"
+	"github.com/BenedictKing/ccx/internal/types"
 )
 
 func TestEstimateTokens(t *testing.T) {

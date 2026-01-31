@@ -2,7 +2,7 @@
 name: version-bump
 description: 升级项目版本号并提交git，支持patch/minor/major版本升级或指定具体版本号
 version: 1.1.0
-author: https://github.com/BenedictKing/claude-proxy/
+author: https://github.com/BenedictKing/ccx/
 allowed-tools: Bash, Read, Write
 context: fork
 ---
@@ -215,9 +215,9 @@ git push origin v{新版本号}
 
 | Workflow              | Runner         | 产物                                                               |
 | --------------------- | -------------- | ------------------------------------------------------------------ |
-| `release-linux.yml`   | ubuntu-latest  | `claude-proxy-linux-amd64`, `claude-proxy-linux-arm64`             |
-| `release-macos.yml`   | macos-latest   | `claude-proxy-darwin-amd64`, `claude-proxy-darwin-arm64`           |
-| `release-windows.yml` | windows-latest | `claude-proxy-windows-amd64.exe`, `claude-proxy-windows-arm64.exe` |
+| `release-linux.yml`   | ubuntu-latest  | `ccx-linux-amd64`, `ccx-linux-arm64`             |
+| `release-macos.yml`   | macos-latest   | `ccx-darwin-amd64`, `ccx-darwin-arm64`           |
+| `release-windows.yml` | windows-latest | `ccx-windows-amd64.exe`, `ccx-windows-arm64.exe` |
 | `docker-build.yml`    | ubuntu-latest  | Docker 镜像 (阿里云容器镜像服务, linux/amd64 + linux/arm64)        |
 
 ### Concurrency 配置

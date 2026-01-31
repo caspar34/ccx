@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BenedictKing/claude-proxy/internal/types"
-	"github.com/BenedictKing/claude-proxy/internal/utils"
+	"github.com/BenedictKing/ccx/internal/types"
+	"github.com/BenedictKing/ccx/internal/utils"
 )
 
 // RequestRecord 带时间戳的请求记录（扩展版，支持 Token 和 Cache 数据）

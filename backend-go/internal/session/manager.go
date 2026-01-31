@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BenedictKing/claude-proxy/internal/types"
+	"github.com/BenedictKing/ccx/internal/types"
 )
 
 // Session 会话数据结构

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BenedictKing/claude-proxy/internal/utils"
+	"github.com/BenedictKing/ccx/internal/utils"
 
 	"github.com/fsnotify/fsnotify"
 )

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/BenedictKing/claude-proxy/internal/config"
+	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/gin-gonic/gin"
 )
 

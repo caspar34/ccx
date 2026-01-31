@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BenedictKing/claude-proxy/internal/utils"
+	"github.com/BenedictKing/ccx/internal/utils"
 )
 
 func TestPatchUsageFieldsWithLog_NilInputTokens(t *testing.T) {
