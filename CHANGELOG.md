@@ -4,6 +4,22 @@
 
 ---
 
+## [v2.6.1] - 2026-02-01
+
+### 修复
+
+- **低质量渠道 message_start 事件 usage 修补** - 修复低质量渠道模式下 `message_start` 事件中虚假 `input_tokens` 未被修补的问题
+  - 问题：当 `lowQuality=true` 且 `input_tokens >= 10` 时，`PatchMessageStartInputTokensIfNeeded` 函数会跳过修补，导致虚假值（如 25599）被直接返回
+  - 修复：在条件判断中增加 `!lowQuality` 检查，确保低质量渠道始终调用 `PatchTokensInEvent` 进行 5% 偏差检测
+  - 涉及文件：`backend-go/internal/handlers/common/stream.go`
+
+- **message_start 事件 output_tokens 误修补** - 修复 `output_tokens=1` 被错误修补为 `0` 的问题
+  - 问题：`patchUsageFieldsWithLog` 的常规修补逻辑在 `estimatedOutput=0` 时仍会将 `output_tokens=1` 修补为 `0`
+  - 修复：在常规 output_tokens 修补条件中增加 `estimatedOutput > 0` 检查，避免用无效估算值覆盖正常的初始值
+  - 涉及文件：`backend-go/internal/handlers/common/stream.go`
+
+---
+
 ## [v2.5.13] - 2026-01-31
 
 ### 修复

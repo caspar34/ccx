@@ -782,7 +782,8 @@ func PatchMessageStartInputTokensIfNeeded(event string, requestBody []byte, need
 		usageData.CacheCreation1hInputTokens > 0
 
 	// 仅在 input_tokens 明显异常时提前补齐；缓存命中场景不应强行补 input_tokens（除非上游返回 nil）
-	if !needInputPatch && (hasCacheTokens || usageData.InputTokens >= 10) {
+	// 低质量渠道模式下，即使 input_tokens >= 10 也需要进行偏差检测
+	if !lowQuality && !needInputPatch && (hasCacheTokens || usageData.InputTokens >= 10) {
 		return event
 	}
 
@@ -867,7 +868,7 @@ func patchUsageFieldsWithLog(usage map[string]interface{}, estimatedInput, estim
 		}
 	}
 
-	if !outputPatched {
+	if !outputPatched && estimatedOutput > 0 {
 		if v, ok := usage["output_tokens"].(float64); ok {
 			currentOutput := int(v)
 			if currentOutput <= 1 || (estimatedOutput > currentOutput && estimatedOutput > 1) {

@@ -791,9 +791,3 @@ cd backend-go && make help
 ## 📄 许可证
 
 本项目基于 MIT 许可证开源 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 🙏 致谢
-
-- [Anthropic](https://www.anthropic.com/) - Claude API
-- [OpenAI](https://openai.com/) - Codex API
-- [Google](https://cloud.google.com/vertex-ai) - Gemini API
