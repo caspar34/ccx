@@ -283,6 +283,16 @@
                     </template>
                     <v-list-item-title>测试延迟</v-list-item-title>
                   </v-list-item>
+                  <v-list-item @click="copyChannelInfo(element)">
+                    <template #prepend>
+                      <v-icon size="small" :color="copiedChannelIndex === element.index ? 'success' : ''">
+                        {{ copiedChannelIndex === element.index ? 'mdi-check' : 'mdi-content-copy' }}
+                      </v-icon>
+                    </template>
+                    <v-list-item-title>
+                      {{ copiedChannelIndex === element.index ? '已复制!' : '复制配置' }}
+                    </v-list-item-title>
+                  </v-list-item>
                   <v-list-item @click="setPromotion(element)">
                     <template #prepend>
                       <v-icon size="small" color="info">mdi-rocket-launch</v-icon>
@@ -424,6 +434,16 @@
                   </template>
                   <v-list-item-title>编辑</v-list-item-title>
                 </v-list-item>
+                <v-list-item @click="copyChannelInfo(channel)">
+                  <template #prepend>
+                    <v-icon size="small" :color="copiedChannelIndex === channel.index ? 'success' : ''">
+                      {{ copiedChannelIndex === channel.index ? 'mdi-check' : 'mdi-content-copy' }}
+                    </v-icon>
+                  </template>
+                  <v-list-item-title>
+                    {{ copiedChannelIndex === channel.index ? '已复制!' : '复制配置' }}
+                  </v-list-item-title>
+                </v-list-item>
                 <v-divider />
                 <v-list-item @click="enableChannel(channel.index)">
                   <template #prepend>
@@ -510,9 +530,68 @@ let activityUpdateTimer: ReturnType<typeof setInterval> | null = null
 // 图表展开状态
 const expandedChannelIndex = ref<number | null>(null)
 
+// 复制渠道配置状态
+const copiedChannelIndex = ref<number | null>(null)
+
 // 切换渠道图表展开/收起
 const toggleChannelChart = (channelIndex: number) => {
   expandedChannelIndex.value = expandedChannelIndex.value === channelIndex ? null : channelIndex
+}
+
+// 复制渠道配置到剪贴板（BaseURL + API Keys，按行分隔）
+const copyChannelInfo = async (channel: Channel) => {
+  // 收集所有 BaseURL
+  const baseUrls: string[] = []
+  if (channel.baseUrls && channel.baseUrls.length > 0) {
+    baseUrls.push(...channel.baseUrls)
+  } else if (channel.baseUrl) {
+    baseUrls.push(channel.baseUrl)
+  }
+
+  // 构建复制内容：BaseURL 和 API Keys 按行分隔
+  const lines: string[] = []
+
+  // 添加 BaseURL（如果有多个则全部添加）
+  baseUrls.forEach(url => lines.push(url))
+
+  // 添加所有 API Keys
+  channel.apiKeys.forEach(key => lines.push(key))
+
+  const content = lines.join('\n')
+
+  try {
+    await navigator.clipboard.writeText(content)
+    copiedChannelIndex.value = channel.index
+
+    // 2 秒后重置复制状态
+    setTimeout(() => {
+      copiedChannelIndex.value = null
+    }, 2000)
+  } catch (err) {
+    console.error('复制渠道配置失败:', err)
+    // 降级方案：使用传统的复制方法
+    const textArea = document.createElement('textarea')
+    textArea.value = content
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+
+    try {
+      document.execCommand('copy')
+      copiedChannelIndex.value = channel.index
+
+      setTimeout(() => {
+        copiedChannelIndex.value = null
+      }, 2000)
+    } catch (copyErr) {
+      console.error('降级复制方案也失败:', copyErr)
+    } finally {
+      textArea.remove()
+    }
+  }
 }
 
 // 活跃渠道（可拖拽排序）- 包含 active 和 suspended 状态

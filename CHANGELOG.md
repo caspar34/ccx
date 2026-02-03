@@ -4,6 +4,28 @@
 
 ---
 
+## [Unreleased]
+
+### 新增
+
+- **渠道配置复制功能** - 在渠道右侧弹出菜单中新增"复制配置"选项
+  - 点击后将渠道的所有 BaseURL 和 API Key 按行分隔复制到系统剪贴板
+  - 方便用户分享配置或快速创建新渠道
+  - 支持活跃渠道和备用池渠道
+  - 涉及文件：`frontend/src/components/ChannelOrchestration.vue`
+
+### 修复
+
+- **删除渠道时共享 MetricsKey 数据丢失** - 修复删除渠道时误删其他渠道共享指标数据的问题
+  - 问题：当两个渠道使用相同的 (BaseURL, APIKey) 组合时，删除其中一个渠道会导致另一个渠道的统计数据也被清除
+  - 原因：Metrics 按 `hash(baseURL + apiKey)` 存储，删除时直接删除 MetricsKey，未检查是否有其他渠道共享
+  - 修复：在 `DeleteChannelMetrics()` 中增加共享检测逻辑，只删除不被其他渠道使用的独占 MetricsKey
+  - 新增 `collectOtherChannelCombinations()` 辅助方法收集其他渠道的组合
+  - 新增 `uniqueStrings()` 去重辅助函数
+  - 涉及文件：`backend-go/internal/scheduler/channel_scheduler.go`
+
+---
+
 ## [v2.6.1] - 2026-02-01
 
 ### 修复
