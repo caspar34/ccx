@@ -1229,6 +1229,44 @@ func (m *MetricsManager) DeleteChannelMetrics(baseURLs, apiKeys []string) int64 
 	return 0
 }
 
+// DeleteByMetricsKeys 按 metricsKey 列表直接删除指标数据（内存 + 持久化）
+// 用于精确删除特定的 (BaseURL, APIKey) 组合，避免笛卡尔积误删
+func (m *MetricsManager) DeleteByMetricsKeys(metricsKeys []string) int64 {
+	if len(metricsKeys) == 0 {
+		return 0
+	}
+
+	// 1. 删除内存指标
+	m.mu.Lock()
+	var deletedFromMemory int
+	for _, metricsKey := range metricsKeys {
+		if _, exists := m.keyMetrics[metricsKey]; exists {
+			delete(m.keyMetrics, metricsKey)
+			deletedFromMemory++
+		}
+	}
+	m.mu.Unlock()
+
+	if deletedFromMemory > 0 {
+		log.Printf("[Metrics-Delete] 已删除 %d 个内存指标记录", deletedFromMemory)
+	}
+
+	// 2. 删除持久化数据
+	if m.store != nil {
+		deleted, err := m.store.DeleteRecordsByMetricsKeys(metricsKeys, m.apiType)
+		if err != nil {
+			log.Printf("[Metrics-Delete] 警告: 删除持久化指标记录失败: %v", err)
+			return 0
+		}
+		if deleted > 0 {
+			log.Printf("[Metrics-Delete] 已删除 %d 条 %s 持久化指标记录", deleted, m.apiType)
+		}
+		return deleted
+	}
+
+	return 0
+}
+
 // cleanupCircuitBreakers 后台任务：定期检查并恢复超时的熔断 Key，清理过期指标
 func (m *MetricsManager) cleanupCircuitBreakers() {
 	ticker := time.NewTicker(1 * time.Minute)

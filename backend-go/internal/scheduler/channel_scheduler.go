@@ -419,6 +419,7 @@ func (s *ChannelScheduler) ResetKeyMetrics(baseURL, apiKey string, kind ChannelK
 // DeleteChannelMetrics 删除渠道的所有指标数据（内存 + 持久化）
 // 用于删除渠道时清理相关的统计数据
 // 注意：如果其他渠道使用相同的 (BaseURL, APIKey) 组合，则保留对应的 MetricsKey
+// 前置条件：调用此方法前，被删除的渠道应已从 config 中移除
 func (s *ChannelScheduler) DeleteChannelMetrics(upstream *config.UpstreamConfig, kind ChannelKind) {
 	if upstream == nil {
 		return
@@ -429,43 +430,46 @@ func (s *ChannelScheduler) DeleteChannelMetrics(upstream *config.UpstreamConfig,
 	deletedKeys := append([]string{}, upstream.APIKeys...)
 	deletedKeys = append(deletedKeys, upstream.HistoricalAPIKeys...)
 
-	// 收集其他渠道使用的 (BaseURL, APIKey) 组合
-	otherUsedCombinations := s.collectOtherChannelCombinations(kind, deletedBaseURLs, deletedKeys)
+	// 收集当前配置中所有渠道使用的 (BaseURL, APIKey) 组合
+	// 注意：此时被删除渠道应已从 config 中移除
+	usedCombinations := s.collectUsedCombinations(kind)
 
-	// 过滤出只被删除渠道独占的组合
-	var exclusiveBaseURLs []string
-	var exclusiveKeys []string
+	// 收集只被删除渠道独占的 metricsKey 列表（使用 map 去重）
+	exclusiveKeysSet := make(map[string]struct{})
 
 	for _, baseURL := range deletedBaseURLs {
 		for _, apiKey := range deletedKeys {
 			combinationKey := baseURL + "|" + apiKey
-			if !otherUsedCombinations[combinationKey] {
+			if !usedCombinations[combinationKey] {
 				// 这个组合没有被其他渠道使用，可以删除
-				exclusiveBaseURLs = append(exclusiveBaseURLs, baseURL)
-				exclusiveKeys = append(exclusiveKeys, apiKey)
+				metricsKey := metrics.GenerateMetricsKey(baseURL, apiKey)
+				exclusiveKeysSet[metricsKey] = struct{}{}
 			}
 		}
 	}
 
+	// 转换为切片
+	exclusiveMetricsKeys := make([]string, 0, len(exclusiveKeysSet))
+	for key := range exclusiveKeysSet {
+		exclusiveMetricsKeys = append(exclusiveMetricsKeys, key)
+	}
+
 	prefix := kindSchedulerLogPrefix(kind)
+	metricsManager := s.getMetricsManager(kind)
 
 	// 只删除独占的 MetricsKey
-	if len(exclusiveBaseURLs) > 0 && len(exclusiveKeys) > 0 {
-		// 去重
-		exclusiveBaseURLs = uniqueStrings(exclusiveBaseURLs)
-		exclusiveKeys = uniqueStrings(exclusiveKeys)
-
-		metricsManager := s.getMetricsManager(kind)
-		metricsManager.DeleteChannelMetrics(exclusiveBaseURLs, exclusiveKeys)
-		log.Printf("[%s-Delete] 渠道 %s 的独占指标数据已清理", prefix, upstream.Name)
+	if len(exclusiveMetricsKeys) > 0 {
+		metricsManager.DeleteByMetricsKeys(exclusiveMetricsKeys)
+		log.Printf("[%s-Delete] 渠道 %s 的 %d 个独占指标数据已清理", prefix, upstream.Name, len(exclusiveMetricsKeys))
 	} else {
 		log.Printf("[%s-Delete] 渠道 %s 的指标数据被其他渠道共享，已保留", prefix, upstream.Name)
 	}
 }
 
-// collectOtherChannelCombinations 收集其他渠道使用的 (BaseURL, APIKey) 组合
+// collectUsedCombinations 收集当前配置中所有渠道使用的 (BaseURL, APIKey) 组合
 // 返回 map[string]bool，key 格式为 "baseURL|apiKey"
-func (s *ChannelScheduler) collectOtherChannelCombinations(kind ChannelKind, targetBaseURLs, targetKeys []string) map[string]bool {
+// 注意：调用此方法前，被删除的渠道应已从 config 中移除
+func (s *ChannelScheduler) collectUsedCombinations(kind ChannelKind) map[string]bool {
 	cfg := s.configManager.GetConfig()
 
 	var upstreams []config.UpstreamConfig
@@ -478,16 +482,8 @@ func (s *ChannelScheduler) collectOtherChannelCombinations(kind ChannelKind, tar
 		upstreams = cfg.Upstream
 	}
 
-	// 构建目标组合的快速查找集合
-	targetCombinations := make(map[string]bool)
-	for _, baseURL := range targetBaseURLs {
-		for _, apiKey := range targetKeys {
-			targetCombinations[baseURL+"|"+apiKey] = true
-		}
-	}
-
-	// 收集其他渠道中与目标组合重叠的部分
-	otherUsed := make(map[string]bool)
+	// 收集所有渠道的 (BaseURL, APIKey) 组合
+	usedCombinations := make(map[string]bool)
 	for _, upstream := range upstreams {
 		baseURLs := upstream.GetAllBaseURLs()
 		allKeys := append([]string{}, upstream.APIKeys...)
@@ -496,28 +492,12 @@ func (s *ChannelScheduler) collectOtherChannelCombinations(kind ChannelKind, tar
 		for _, baseURL := range baseURLs {
 			for _, apiKey := range allKeys {
 				combinationKey := baseURL + "|" + apiKey
-				// 只记录与目标组合重叠的部分
-				if targetCombinations[combinationKey] {
-					otherUsed[combinationKey] = true
-				}
+				usedCombinations[combinationKey] = true
 			}
 		}
 	}
 
-	return otherUsed
-}
-
-// uniqueStrings 字符串切片去重
-func uniqueStrings(slice []string) []string {
-	seen := make(map[string]bool)
-	result := make([]string, 0, len(slice))
-	for _, s := range slice {
-		if !seen[s] {
-			seen[s] = true
-			result = append(result, s)
-		}
-	}
-	return result
+	return usedCombinations
 }
 
 // GetActiveChannelCount 获取活跃渠道数量
