@@ -4,7 +4,7 @@
 
 ---
 
-## [Unreleased]
+## [v2.6.2] - 2026-02-04
 
 ### 新增
 
@@ -14,15 +14,29 @@
   - 支持活跃渠道和备用池渠道
   - 涉及文件：`frontend/src/components/ChannelOrchestration.vue`
 
+- **DeleteChannelMetrics 测试覆盖** - 新增共享 MetricsKey 删除场景的单元测试
+  - `TestDeleteChannelMetrics_SharedMetricsKeyPreserved` - 验证共享 metricsKey 被保留
+  - `TestDeleteChannelMetrics_AllExclusiveKeysDeleted` - 验证独占 metricsKey 全部删除
+  - `TestDeleteChannelMetrics_PreconditionWarning` - 验证前置条件违反时的行为
+  - 涉及文件：`backend-go/internal/scheduler/channel_scheduler_test.go`
+
 ### 修复
 
 - **删除渠道时共享 MetricsKey 数据丢失** - 修复删除渠道时误删其他渠道共享指标数据的问题
   - 问题：当两个渠道使用相同的 (BaseURL, APIKey) 组合时，删除其中一个渠道会导致另一个渠道的统计数据也被清除
   - 原因：Metrics 按 `hash(baseURL + apiKey)` 存储，删除时直接删除 MetricsKey，未检查是否有其他渠道共享
   - 修复：在 `DeleteChannelMetrics()` 中增加共享检测逻辑，只删除不被其他渠道使用的独占 MetricsKey
-  - 新增 `collectOtherChannelCombinations()` 辅助方法收集其他渠道的组合
-  - 新增 `uniqueStrings()` 去重辅助函数
+  - 新增 `collectUsedCombinations()` 辅助方法收集其他渠道的组合
+  - 新增 `isUpstreamInConfig()` 前置条件守卫，检测渠道是否仍在配置中
   - 涉及文件：`backend-go/internal/scheduler/channel_scheduler.go`
+
+- **DeleteByMetricsKeys 返回值语义不清晰** - 补充方法注释说明返回值语义
+  - 返回持久化存储删除的记录数，未配置存储或删除失败时返回 0
+  - 涉及文件：`backend-go/internal/metrics/channel_metrics.go`
+
+- **前端复制配置 timeout 未清理** - 修复组件卸载时 `copyTimeoutId` 未清理的问题
+  - 在 `onUnmounted` 钩子中添加 `clearTimeout(copyTimeoutId)` 清理逻辑
+  - 涉及文件：`frontend/src/components/ChannelOrchestration.vue`
 
 ---
 

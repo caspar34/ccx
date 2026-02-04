@@ -272,3 +272,254 @@ func TestExpiredPromotionNotBypassHealthCheck(t *testing.T) {
 		t.Errorf("期望选择 healthy-channel，实际选择了 %s", result.Upstream.Name)
 	}
 }
+
+// TestDeleteChannelMetrics_SharedMetricsKeyPreserved 测试删除渠道时共享的 metricsKey 被保留
+func TestDeleteChannelMetrics_SharedMetricsKeyPreserved(t *testing.T) {
+	// 场景：两个渠道共享同一个 (BaseURL, APIKey) 组合
+	// 删除其中一个渠道时，共享的 metricsKey 应该被保留
+
+	testCases := []struct {
+		name string
+		kind ChannelKind
+	}{
+		{"Messages", ChannelKindMessages},
+		{"Responses", ChannelKindResponses},
+		{"Gemini", ChannelKindGemini},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sharedBaseURL := "https://shared.example.com"
+			sharedAPIKey := "sk-shared-key"
+
+			// 根据渠道类型构建配置
+			var cfg config.Config
+			switch tc.kind {
+			case ChannelKindMessages:
+				cfg = config.Config{
+					Upstream: []config.UpstreamConfig{
+						{
+							Name:     "channel-A",
+							BaseURL:  sharedBaseURL,
+							APIKeys:  []string{sharedAPIKey, "sk-exclusive-A"},
+							Status:   "active",
+							Priority: 1,
+						},
+						{
+							Name:     "channel-B",
+							BaseURL:  sharedBaseURL,
+							APIKeys:  []string{sharedAPIKey},
+							Status:   "active",
+							Priority: 2,
+						},
+					},
+				}
+			case ChannelKindResponses:
+				cfg = config.Config{
+					ResponsesUpstream: []config.UpstreamConfig{
+						{
+							Name:     "channel-A",
+							BaseURL:  sharedBaseURL,
+							APIKeys:  []string{sharedAPIKey, "sk-exclusive-A"},
+							Status:   "active",
+							Priority: 1,
+						},
+						{
+							Name:     "channel-B",
+							BaseURL:  sharedBaseURL,
+							APIKeys:  []string{sharedAPIKey},
+							Status:   "active",
+							Priority: 2,
+						},
+					},
+				}
+			case ChannelKindGemini:
+				cfg = config.Config{
+					GeminiUpstream: []config.UpstreamConfig{
+						{
+							Name:     "channel-A",
+							BaseURL:  sharedBaseURL,
+							APIKeys:  []string{sharedAPIKey, "sk-exclusive-A"},
+							Status:   "active",
+							Priority: 1,
+						},
+						{
+							Name:     "channel-B",
+							BaseURL:  sharedBaseURL,
+							APIKeys:  []string{sharedAPIKey},
+							Status:   "active",
+							Priority: 2,
+						},
+					},
+				}
+			}
+
+			scheduler, cleanup := createTestScheduler(t, cfg)
+			defer cleanup()
+
+			// 根据渠道类型获取对应的 metricsManager
+			var metricsManager *metrics.MetricsManager
+			switch tc.kind {
+			case ChannelKindMessages:
+				metricsManager = scheduler.messagesMetricsManager
+			case ChannelKindResponses:
+				metricsManager = scheduler.responsesMetricsManager
+			case ChannelKindGemini:
+				metricsManager = scheduler.geminiMetricsManager
+			}
+
+			// 为所有 key 记录一些指标
+			metricsManager.RecordSuccess(sharedBaseURL, sharedAPIKey)
+			metricsManager.RecordSuccess(sharedBaseURL, "sk-exclusive-A")
+
+			// 验证指标存在
+			sharedMetricsKey := metrics.GenerateMetricsKey(sharedBaseURL, sharedAPIKey)
+			exclusiveMetricsKey := metrics.GenerateMetricsKey(sharedBaseURL, "sk-exclusive-A")
+
+			if !hasMetricsKey(metricsManager.GetAllKeyMetrics(), sharedMetricsKey) {
+				t.Fatal("共享 metricsKey 应该存在")
+			}
+			if !hasMetricsKey(metricsManager.GetAllKeyMetrics(), exclusiveMetricsKey) {
+				t.Fatal("独占 metricsKey 应该存在")
+			}
+
+			// 从配置中移除 channel-A
+			var channelAConfig config.UpstreamConfig
+			var err error
+			switch tc.kind {
+			case ChannelKindMessages:
+				channelAConfig = cfg.Upstream[0]
+				_, err = scheduler.configManager.RemoveUpstream(0)
+			case ChannelKindResponses:
+				channelAConfig = cfg.ResponsesUpstream[0]
+				_, err = scheduler.configManager.RemoveResponsesUpstream(0)
+			case ChannelKindGemini:
+				channelAConfig = cfg.GeminiUpstream[0]
+				_, err = scheduler.configManager.RemoveGeminiUpstream(0)
+			}
+			if err != nil {
+				t.Fatalf("移除渠道失败: %v", err)
+			}
+
+			// 调用 DeleteChannelMetrics
+			scheduler.DeleteChannelMetrics(&channelAConfig, tc.kind)
+
+			// 验证结果
+			// 共享的 metricsKey 应该被保留（因为 channel-B 还在使用）
+			if !hasMetricsKey(metricsManager.GetAllKeyMetrics(), sharedMetricsKey) {
+				t.Error("共享 metricsKey 应该被保留，但被删除了")
+			}
+
+			// 独占的 metricsKey 应该被删除
+			if hasMetricsKey(metricsManager.GetAllKeyMetrics(), exclusiveMetricsKey) {
+				t.Error("独占 metricsKey 应该被删除，但仍然存在")
+			}
+		})
+	}
+}
+
+// TestDeleteChannelMetrics_AllExclusiveKeysDeleted 测试删除渠道时所有独占的 metricsKey 都被删除
+func TestDeleteChannelMetrics_AllExclusiveKeysDeleted(t *testing.T) {
+	// 场景：渠道有多个独占的 (BaseURL, APIKey) 组合
+	cfg := config.Config{
+		Upstream: []config.UpstreamConfig{
+			{
+				Name:     "channel-to-delete",
+				BaseURL:  "https://exclusive.example.com",
+				APIKeys:  []string{"sk-key-1", "sk-key-2"},
+				Status:   "active",
+				Priority: 1,
+			},
+			{
+				Name:     "other-channel",
+				BaseURL:  "https://other.example.com",
+				APIKeys:  []string{"sk-other-key"},
+				Status:   "active",
+				Priority: 2,
+			},
+		},
+	}
+
+	scheduler, cleanup := createTestScheduler(t, cfg)
+	defer cleanup()
+
+	metricsManager := scheduler.messagesMetricsManager
+
+	// 为所有 key 记录指标
+	metricsManager.RecordSuccess("https://exclusive.example.com", "sk-key-1")
+	metricsManager.RecordSuccess("https://exclusive.example.com", "sk-key-2")
+	metricsManager.RecordSuccess("https://other.example.com", "sk-other-key")
+
+	// 从配置中移除要删除的渠道
+	channelToDelete := cfg.Upstream[0]
+	_, err := scheduler.configManager.RemoveUpstream(0)
+	if err != nil {
+		t.Fatalf("移除渠道失败: %v", err)
+	}
+
+	// 调用 DeleteChannelMetrics
+	scheduler.DeleteChannelMetrics(&channelToDelete, ChannelKindMessages)
+
+	// 验证结果
+	key1 := metrics.GenerateMetricsKey("https://exclusive.example.com", "sk-key-1")
+	key2 := metrics.GenerateMetricsKey("https://exclusive.example.com", "sk-key-2")
+	otherKey := metrics.GenerateMetricsKey("https://other.example.com", "sk-other-key")
+
+	// 被删除渠道的所有 metricsKey 都应该被删除
+	if hasMetricsKey(metricsManager.GetAllKeyMetrics(), key1) {
+		t.Error("sk-key-1 的 metricsKey 应该被删除")
+	}
+	if hasMetricsKey(metricsManager.GetAllKeyMetrics(), key2) {
+		t.Error("sk-key-2 的 metricsKey 应该被删除")
+	}
+	// 其他渠道的 metricsKey 应该保留
+	if !hasMetricsKey(metricsManager.GetAllKeyMetrics(), otherKey) {
+		t.Error("其他渠道的 metricsKey 应该被保留")
+	}
+}
+
+// TestDeleteChannelMetrics_SkipsWhenUpstreamStillInConfig 测试前置条件守卫：渠道仍在配置中时跳过删除
+func TestDeleteChannelMetrics_SkipsWhenUpstreamStillInConfig(t *testing.T) {
+	// 场景：在渠道仍在配置中时调用 DeleteChannelMetrics
+	// 应该记录警告但仍然执行（可能结果不正确）
+	cfg := config.Config{
+		Upstream: []config.UpstreamConfig{
+			{
+				Name:     "channel-still-in-config",
+				BaseURL:  "https://example.com",
+				APIKeys:  []string{"sk-key"},
+				Status:   "active",
+				Priority: 1,
+			},
+		},
+	}
+
+	scheduler, cleanup := createTestScheduler(t, cfg)
+	defer cleanup()
+
+	metricsManager := scheduler.messagesMetricsManager
+	metricsManager.RecordSuccess("https://example.com", "sk-key")
+
+	// 不从配置中移除渠道，直接调用 DeleteChannelMetrics
+	// 这违反了前置条件，但方法应该仍然执行（只是结果可能不正确）
+	channelConfig := cfg.Upstream[0]
+	scheduler.DeleteChannelMetrics(&channelConfig, ChannelKindMessages)
+
+	// 由于渠道仍在配置中，collectUsedCombinations 会返回该组合
+	// 因此 metricsKey 不会被删除
+	metricsKey := metrics.GenerateMetricsKey("https://example.com", "sk-key")
+
+	if !hasMetricsKey(metricsManager.GetAllKeyMetrics(), metricsKey) {
+		t.Error("由于渠道仍在配置中，metricsKey 应该被保留（前置条件违反时的预期行为）")
+	}
+}
+
+// hasMetricsKey 辅助函数：检查 metricsKey 是否存在于指标列表中
+func hasMetricsKey(allMetrics []*metrics.KeyMetrics, metricsKey string) bool {
+	for _, m := range allMetrics {
+		if m.MetricsKey == metricsKey {
+			return true
+		}
+	}
+	return false
+}

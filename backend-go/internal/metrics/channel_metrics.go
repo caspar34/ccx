@@ -1231,6 +1231,11 @@ func (m *MetricsManager) DeleteChannelMetrics(baseURLs, apiKeys []string) int64 
 
 // DeleteByMetricsKeys 按 metricsKey 列表直接删除指标数据（内存 + 持久化）
 // 用于精确删除特定的 (BaseURL, APIKey) 组合，避免笛卡尔积误删
+//
+// 返回值语义：
+//   - 如果配置了持久化存储：返回从持久化存储中删除的记录数
+//   - 如果未配置持久化存储或删除失败：返回 0
+//   - 注意：内存中的删除数量通过日志输出，不影响返回值
 func (m *MetricsManager) DeleteByMetricsKeys(metricsKeys []string) int64 {
 	if len(metricsKeys) == 0 {
 		return 0

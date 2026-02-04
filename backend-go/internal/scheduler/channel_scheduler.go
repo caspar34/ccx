@@ -425,6 +425,14 @@ func (s *ChannelScheduler) DeleteChannelMetrics(upstream *config.UpstreamConfig,
 		return
 	}
 
+	prefix := kindSchedulerLogPrefix(kind)
+
+	// 前置条件守卫：检查被删除渠道是否仍在配置中
+	// 如果仍在配置中，说明调用时机不对，记录警告并继续执行（但结果可能不正确）
+	if s.isUpstreamInConfig(upstream, kind) {
+		log.Printf("[%s-Delete] 警告: 渠道 %s 仍在配置中，删除指标可能不完整（应先从配置中移除）", prefix, upstream.Name)
+	}
+
 	// 获取被删除渠道的所有 (BaseURL, APIKey) 组合
 	deletedBaseURLs := upstream.GetAllBaseURLs()
 	deletedKeys := append([]string{}, upstream.APIKeys...)
@@ -454,7 +462,6 @@ func (s *ChannelScheduler) DeleteChannelMetrics(upstream *config.UpstreamConfig,
 		exclusiveMetricsKeys = append(exclusiveMetricsKeys, key)
 	}
 
-	prefix := kindSchedulerLogPrefix(kind)
 	metricsManager := s.getMetricsManager(kind)
 
 	// 只删除独占的 MetricsKey
@@ -498,6 +505,29 @@ func (s *ChannelScheduler) collectUsedCombinations(kind ChannelKind) map[string]
 	}
 
 	return usedCombinations
+}
+
+// isUpstreamInConfig 检查指定的 upstream 是否仍在当前配置中
+// 通过比较 Name 字段判断（Name 在同类型渠道中应唯一）
+func (s *ChannelScheduler) isUpstreamInConfig(upstream *config.UpstreamConfig, kind ChannelKind) bool {
+	cfg := s.configManager.GetConfig()
+
+	var upstreams []config.UpstreamConfig
+	switch kind {
+	case ChannelKindResponses:
+		upstreams = cfg.ResponsesUpstream
+	case ChannelKindGemini:
+		upstreams = cfg.GeminiUpstream
+	default:
+		upstreams = cfg.Upstream
+	}
+
+	for _, u := range upstreams {
+		if u.Name == upstream.Name {
+			return true
+		}
+	}
+	return false
 }
 
 // GetActiveChannelCount 获取活跃渠道数量

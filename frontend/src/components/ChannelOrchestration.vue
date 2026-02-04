@@ -1278,6 +1278,10 @@ onUnmounted(() => {
     clearInterval(activityUpdateTimer)
     activityUpdateTimer = null
   }
+  if (copyTimeoutId) {
+    clearTimeout(copyTimeoutId)
+    copyTimeoutId = null
+  }
 })
 
 // 暴露方法给父组件

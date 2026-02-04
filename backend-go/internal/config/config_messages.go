@@ -38,6 +38,13 @@ func (cm *ConfigManager) AddUpstream(upstream UpstreamConfig) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
+	// 检查 Name 是否已存在
+	for _, existing := range cm.config.Upstream {
+		if existing.Name == upstream.Name {
+			return fmt.Errorf("渠道名称 '%s' 已存在", upstream.Name)
+		}
+	}
+
 	// 新建渠道默认设为 active
 	if upstream.Status == "" {
 		upstream.Status = "active"
