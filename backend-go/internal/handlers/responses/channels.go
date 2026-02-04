@@ -96,7 +96,7 @@ func UpdateUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 }
 
 // DeleteUpstream 删除 Responses 上游
-func DeleteUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelScheduler) gin.HandlerFunc {
+func DeleteUpstream(cfgManager *config.ConfigManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
@@ -105,7 +105,7 @@ func DeleteUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 			return
 		}
 
-		removed, err := cfgManager.RemoveResponsesUpstream(id)
+		_, err = cfgManager.RemoveResponsesUpstream(id)
 		if err != nil {
 			if strings.Contains(err.Error(), "无效的") {
 				c.JSON(404, gin.H{"error": "Upstream not found"})
@@ -114,9 +114,6 @@ func DeleteUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 			}
 			return
 		}
-
-		// 删除成功后清理指标数据（使用 RemoveResponsesUpstream 返回的渠道信息）
-		sch.DeleteChannelMetrics(removed, scheduler.ChannelKindResponses)
 
 		c.JSON(200, gin.H{"message": "Responses upstream deleted successfully"})
 	}

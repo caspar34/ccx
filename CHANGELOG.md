@@ -4,6 +4,20 @@
 
 ---
 
+## [v2.6.3] - 2025-02-05
+
+### 变更
+
+- **渠道删除时保留历史指标数据** - 删除渠道时不再主动清理指标数据，让数据自然过期
+  - 移除三个渠道删除处理器中的 `DeleteChannelMetrics()` 调用
+  - SQLite 数据将在配置的保留期后自动删除（`METRICS_RETENTION_DAYS`，默认 7 天）
+  - 内存指标将在 48 小时无活动后自动清理
+  - 保持全局历史统计数据完整性，不再因删除渠道而丢失
+  - **注意**：若用相同 BaseURL + APIKey 重建渠道，可能继承近期健康状态/统计（受内存清理窗口与服务重启影响，熔断状态不持久化）
+  - 涉及文件：`backend-go/internal/handlers/messages/channels.go`, `backend-go/internal/handlers/responses/channels.go`, `backend-go/internal/handlers/gemini/channels.go`
+
+---
+
 ## [v2.6.2] - 2026-02-04
 
 ### 新增
