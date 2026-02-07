@@ -4,6 +4,21 @@
 
 ---
 
+## [v2.6.4] - 2026-02-07
+
+### 新增
+
+- **上游空响应自动重试** - 上游返回 HTTP 200 但流式响应内容为空或几乎为空时，自动触发 failover 重试
+  - 空响应定义：OutputTokens == 0（完全无输出）或 OutputTokens == 1 且内容仅为 `{`（截断的 JSON 开头）
+  - 智能预检测：在发送 HTTP 200 Header 之前缓冲上游事件并检查实际输出内容
+  - Messages API：新增 `PreflightStreamEvents()` 预检测函数，延迟 `SetupStreamHeaders()` 调用
+  - Responses API：在 `handleStreamSuccess()` 中新增 scanner 预读取逻辑
+  - Failover 集成：空响应触发 `ErrEmptyStreamResponse`，标记 Key 失败并计入熔断指标，继续尝试下一个 Key/BaseURL/渠道
+  - 预检测超时 30s 保守放行，正常响应延迟约 100-200ms（等到第一个有效 content_block_delta）
+  - 涉及文件：`backend-go/internal/handlers/common/stream.go`, `backend-go/internal/handlers/common/upstream_failover.go`, `backend-go/internal/handlers/responses/handler.go`
+
+---
+
 ## [v2.6.3] - 2025-02-05
 
 ### 变更

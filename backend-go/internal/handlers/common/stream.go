@@ -4,6 +4,7 @@ package common
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,106 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// ErrEmptyStreamResponse 上游返回 HTTP 200 但流式响应内容为空或几乎为空
+// 空响应定义：OutputTokens == 0 或 OutputTokens == 1 且内容仅为 "{"
+var ErrEmptyStreamResponse = errors.New("upstream returned empty stream response")
+
+// StreamPreflightResult 流式预检测结果
+type StreamPreflightResult struct {
+	BufferedEvents []string // 缓冲的事件（需要回放）
+	IsEmpty        bool     // 是否为空响应
+	HasError       bool     // 是否有流错误
+	Error          error    // 流错误
+}
+
+// PreflightStreamEvents 在发送 HTTP Header 之前预检测流式响应是否为空
+// 缓冲事件并检查实际输出内容，避免发送 200 后无法撤销
+func PreflightStreamEvents(eventChan <-chan string, errChan <-chan error) *StreamPreflightResult {
+	result := &StreamPreflightResult{}
+	var textBuf bytes.Buffer
+	timeout := time.NewTimer(30 * time.Second)
+	defer timeout.Stop()
+
+	for {
+		select {
+		case event, ok := <-eventChan:
+			if !ok {
+				// eventChan 关闭：流结束
+				result.IsEmpty = isEmptyContent(textBuf.String())
+				return result
+			}
+			result.BufferedEvents = append(result.BufferedEvents, event)
+
+			// 提取文本内容
+			ExtractTextFromEvent(event, &textBuf)
+
+			// 检查是否有有效内容（非空且不是仅 "{"）
+			if !isEmptyContent(textBuf.String()) {
+				// 非空响应，放行
+				return result
+			}
+
+			// 检查是否为 message_stop 事件（流正常结束）
+			if IsMessageStopEvent(event) {
+				result.IsEmpty = isEmptyContent(textBuf.String())
+				return result
+			}
+
+		case err, ok := <-errChan:
+			if !ok {
+				// errChan 关闭：置为 nil 防止 select 忙等自旋
+				errChan = nil
+				continue
+			}
+			if err != nil {
+				result.HasError = true
+				result.Error = err
+				return result
+			}
+
+		case <-timeout.C:
+			// 超时：保守放行
+			return result
+		}
+	}
+}
+
+// isEmptyContent 判断流式响应的累积文本是否为空内容
+func isEmptyContent(text string) bool {
+	return text == "" || strings.TrimSpace(text) == "{"
+}
+
+// drainChannels 排空 eventChan 和 errChan，防止 provider goroutine 泄漏
+// 使用超时保护，避免在 channel 未关闭时永久阻塞
+func drainChannels(eventChan <-chan string, errChan <-chan error) {
+	go func() {
+		timeout := time.After(60 * time.Second)
+		for {
+			select {
+			case _, ok := <-eventChan:
+				if !ok {
+					return
+				}
+			case <-timeout:
+				return
+			}
+		}
+	}()
+	go func() {
+		timeout := time.After(60 * time.Second)
+		for {
+			select {
+			case _, ok := <-errChan:
+				if !ok {
+					return
+				}
+			case <-timeout:
+				return
+			}
+		}
+	}()
+}
 
 // StreamContext 流处理上下文
 type StreamContext struct {
@@ -465,6 +566,10 @@ func IsClientDisconnectError(err error) bool {
 }
 
 // HandleStreamResponse 处理流式响应（Messages API）
+//
+// 流程：provider.HandleStreamResponse → PreflightStreamEvents（预检测）
+//   - 空响应 → return nil, ErrEmptyStreamResponse（Header 未发送，可安全重试）
+//   - 非空   → SetupStreamHeaders → 回放缓冲事件 → ProcessStreamEvents
 func HandleStreamResponse(
 	c *gin.Context,
 	resp *http.Response,
@@ -483,12 +588,30 @@ func HandleStreamResponse(
 		return nil, err
 	}
 
+	// 预检测：在发送 HTTP Header 之前缓冲事件并检查是否为空响应
+	preflight := PreflightStreamEvents(eventChan, errChan)
+
+	// 流错误：排空 channel 后返回错误
+	if preflight.HasError {
+		drainChannels(eventChan, errChan)
+		return nil, preflight.Error
+	}
+
+	// 空响应：Header 未发送，可安全重试
+	if preflight.IsEmpty {
+		log.Printf("[Messages-EmptyResponse] 上游返回空响应 (缓冲事件数: %d)，触发重试", len(preflight.BufferedEvents))
+		drainChannels(eventChan, errChan)
+		return nil, ErrEmptyStreamResponse
+	}
+
+	// 非空响应：正常流程
 	SetupStreamHeaders(c, resp)
 
 	w := c.Writer
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		log.Printf("[Messages-Stream] 警告: ResponseWriter不支持Flush接口")
+		drainChannels(eventChan, errChan)
 		return nil, fmt.Errorf("ResponseWriter不支持Flush接口")
 	}
 	flusher.Flush()
@@ -497,6 +620,12 @@ func HandleStreamResponse(
 	ctx.RequestModel = requestModel
 	ctx.LowQuality = upstream.LowQuality
 	seedSynthesizerFromRequest(ctx, requestBody)
+
+	// 回放预检测期间缓冲的事件
+	for _, bufferedEvent := range preflight.BufferedEvents {
+		ProcessStreamEvent(c, w, flusher, bufferedEvent, ctx, envCfg, requestBody)
+	}
+
 	return ProcessStreamEvents(c, w, flusher, eventChan, errChan, ctx, envCfg, startTime, requestBody)
 }
 

@@ -212,6 +212,17 @@ func TryUpstreamWithAllKeys(
 					metricsManager.RecordRequestFinalizeClientCancel(currentBaseURL, apiKey, requestID)
 					channelScheduler.RecordRequestEnd(currentBaseURL, apiKey, kind)
 					log.Printf("[%s-Cancel] 请求已取消，停止渠道 failover", apiType)
+				} else if errors.Is(err, ErrEmptyStreamResponse) {
+					// 空响应：Header 未发送，可安全 failover 到下一个 Key/BaseURL/渠道
+					failedKeys[apiKey] = true
+					cfgManager.MarkKeyAsFailed(apiKey, apiType)
+					metricsManager.RecordRequestFinalizeFailure(currentBaseURL, apiKey, requestID)
+					channelScheduler.RecordRequestEnd(currentBaseURL, apiKey, kind)
+					if markURLFailure != nil {
+						markURLFailure(currentBaseURL)
+					}
+					log.Printf("[%s-EmptyResponse] 上游返回空响应 (Key: %s)，尝试下一个密钥", apiType, utils.MaskAPIKey(apiKey))
+					continue
 				} else {
 					// 真实渠道故障：计入失败指标
 					cfgManager.MarkKeyAsFailed(apiKey, apiType)

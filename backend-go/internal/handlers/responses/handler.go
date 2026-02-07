@@ -244,7 +244,7 @@ func handleSuccess(
 	isStream := originalReq != nil && originalReq.Stream
 
 	if isStream {
-		return handleStreamSuccess(c, resp, upstreamType, envCfg, startTime, originalReq, originalRequestJSON), nil
+		return handleStreamSuccess(c, resp, upstreamType, envCfg, startTime, originalReq, originalRequestJSON)
 	}
 
 	// 非流式响应处理
@@ -454,6 +454,10 @@ func estimateResponsesOutputFromItems(output []types.ResponsesItem) int {
 }
 
 // handleStreamSuccess 处理流式响应
+//
+// 流程：预读取行 → 检测空响应
+//   - 空响应 → return nil, ErrEmptyStreamResponse（Header 未发送，可安全重试）
+//   - 非空   → 发送 Header → 回放缓冲行 → 继续读取
 func handleStreamSuccess(
 	c *gin.Context,
 	resp *http.Response,
@@ -462,18 +466,11 @@ func handleStreamSuccess(
 	startTime time.Time,
 	originalReq *types.ResponsesRequest,
 	originalRequestJSON []byte,
-) *types.Usage {
+) (*types.Usage, error) {
 	if envCfg.EnableResponseLogs {
 		responseTime := time.Since(startTime).Milliseconds()
 		log.Printf("[Responses-Stream] Responses 流式响应开始: %dms, 状态: %d", responseTime, resp.StatusCode)
 	}
-
-	utils.ForwardResponseHeaders(resp.Header, c.Writer)
-
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no")
 
 	var synthesizer *utils.StreamSynthesizer
 	var logBuffer bytes.Buffer
@@ -486,13 +483,112 @@ func handleStreamSuccess(
 	needConvert := upstreamType != "responses"
 	var converterState any
 
-	c.Status(resp.StatusCode)
-	flusher, _ := c.Writer.(http.Flusher)
-
 	scanner := bufio.NewScanner(resp.Body)
 	const maxCapacity = 1024 * 1024
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, maxCapacity)
+
+	// 预检测：在发送 HTTP Header 之前缓冲行并检查是否为空响应
+	// 使用 goroutine + channel 实现真正的超时控制（scanner.Scan 是阻塞调用）
+	type scanLine struct {
+		text string
+		ok   bool
+	}
+	lineChan := make(chan scanLine, 1)
+	scanDone := make(chan struct{})
+	go func() {
+		defer close(lineChan)
+		for scanner.Scan() {
+			select {
+			case lineChan <- scanLine{text: scanner.Text(), ok: true}:
+			case <-scanDone:
+				return
+			}
+		}
+		select {
+		case lineChan <- scanLine{ok: false}: // scanner 结束
+		case <-scanDone:
+		}
+	}()
+
+	var bufferedLines []string
+	var preflightTextBuf bytes.Buffer
+	preflightEmpty := false
+	preflightTimeout := time.NewTimer(30 * time.Second)
+	preflightDone := false
+
+	for !preflightDone {
+		select {
+		case sl := <-lineChan:
+			if !sl.ok {
+				// scanner 结束
+				text := preflightTextBuf.String()
+				preflightEmpty = text == "" || strings.TrimSpace(text) == "{"
+				preflightDone = true
+				break
+			}
+			line := sl.text
+			bufferedLines = append(bufferedLines, line)
+
+			// 处理转换后的事件用于文本提取
+			var eventsToCheck []string
+			if needConvert {
+				eventsToCheck = converters.ConvertOpenAIChatToResponses(
+					c.Request.Context(),
+					originalReq.Model,
+					originalRequestJSON,
+					nil,
+					[]byte(line),
+					&converterState,
+				)
+			} else {
+				eventsToCheck = []string{line + "\n"}
+			}
+
+			for _, event := range eventsToCheck {
+				extractResponsesTextFromEvent(event, &preflightTextBuf)
+
+				// 检查是否有有效内容 delta 事件
+				text := preflightTextBuf.String()
+				textIsEmpty := text == "" || strings.TrimSpace(text) == "{"
+				if !textIsEmpty {
+					preflightDone = true
+					break
+				}
+
+				// 检查是否为 response.completed 事件（流正常结束）
+				if isResponsesCompletedEvent(event) {
+					preflightDone = true
+					preflightEmpty = text == "" || strings.TrimSpace(text) == "{"
+					break
+				}
+			}
+
+		case <-preflightTimeout.C:
+			preflightDone = true // 超时保守放行
+		}
+	}
+	preflightTimeout.Stop()
+
+	// 空响应：Header 未发送，可安全重试
+	if preflightEmpty {
+		log.Printf("[Responses-EmptyResponse] 上游返回空响应 (缓冲行数: %d)，触发重试", len(bufferedLines))
+		close(scanDone) // 通知 scanner goroutine 退出
+		return nil, common.ErrEmptyStreamResponse
+	}
+
+	// 非空响应：发送 Header 并回放缓冲行
+	// 重置 converterState 以便回放时重新转换
+	converterState = nil
+
+	utils.ForwardResponseHeaders(resp.Header, c.Writer)
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	c.Status(resp.StatusCode)
+	flusher, _ := c.Writer.(http.Flusher)
 
 	// Token 统计状态
 	var outputTextBuffer bytes.Buffer
@@ -502,8 +598,8 @@ func handleStreamSuccess(
 	needTokenPatch := false
 	clientGone := false
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	// processLine 处理单行数据（复用于缓冲行回放和后续读取）
+	processLine := func(line string) {
 
 		if streamLoggingEnabled {
 			logBuffer.WriteString(line + "\n")
@@ -585,6 +681,19 @@ func handleStreamSuccess(
 		}
 	}
 
+	// 回放预检测期间缓冲的行
+	for _, bufferedLine := range bufferedLines {
+		processLine(bufferedLine)
+	}
+
+	// 继续从 lineChan 读取剩余的流数据
+	for sl := range lineChan {
+		if !sl.ok {
+			break
+		}
+		processLine(sl.text)
+	}
+
 	if err := scanner.Err(); err != nil {
 		log.Printf("[Responses-Stream] 警告: 流式响应读取错误: %v", err)
 	}
@@ -626,7 +735,7 @@ func handleStreamSuccess(
 		CacheCreation5mInputTokens: collectedUsage.CacheCreation5mInputTokens,
 		CacheCreation1hInputTokens: collectedUsage.CacheCreation1hInputTokens,
 		CacheTTL:                   collectedUsage.CacheTTL,
-	}
+	}, nil
 }
 
 // responsesStreamUsage 流式响应 usage 收集结构
@@ -645,10 +754,14 @@ type responsesStreamUsage struct {
 // extractResponsesTextFromEvent 从 Responses SSE 事件中提取文本内容
 func extractResponsesTextFromEvent(event string, buf *bytes.Buffer) {
 	for _, line := range strings.Split(event, "\n") {
-		if !strings.HasPrefix(line, "data: ") {
+		// 支持 "data:" 和 "data: " 两种格式（有些上游不带空格）
+		var jsonStr string
+		if strings.HasPrefix(line, "data:") {
+			jsonStr = strings.TrimPrefix(line, "data:")
+			jsonStr = strings.TrimPrefix(jsonStr, " ") // 移除可能的前导空格
+		} else {
 			continue
 		}
-		jsonStr := strings.TrimPrefix(line, "data: ")
 
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
