@@ -4,6 +4,20 @@
 
 ---
 
+## [v2.6.5] - 2026-02-08
+
+### 修复
+
+- **OpenAI/Gemini 上游流式响应缺少 `message_start`/`message_stop` 事件** - 修复通过 OpenAI/Gemini 上游代理时，Anthropic SDK 报 `Unexpected event order, got content_block_start before "message_start"` 的问题
+  - OpenAI/Gemini provider 的 `HandleStreamResponse` 在协议转换时未生成 Claude Messages API 规范要求的 `message_start` 和 `message_stop` 事件
+  - 新增 `buildMessageStartEvent()` 公共函数，在第一个 `content_block_start` 之前自动发送 `message_start`
+  - 流结束时统一发送 `message_delta`（含 `stop_reason`）+ `message_stop`
+  - 修复 OpenAI provider `finish_reason == "stop"` 时未发送 `message_delta` 的遗漏
+  - 新增 `finish_reason == "length"` → `max_tokens` 的映射
+  - 涉及文件：`backend-go/internal/providers/openai.go`, `backend-go/internal/providers/gemini.go`
+
+---
+
 ## [v2.6.4] - 2026-02-07
 
 ### 新增

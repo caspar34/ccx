@@ -371,6 +371,8 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 		toolUseBlockIndex := 0
 		toolCallAccumulator := make(map[int]*ToolCallAccumulator)
 		toolUseStopEmitted := false
+		messageStartSent := false
+		stopReason := ""
 
 		// 文本块状态跟踪
 		textBlockStarted := false
@@ -416,8 +418,19 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 				continue
 			}
 
+			// 提取模型名称（用于 message_start）
+			model := ""
+			if m, ok := chunk["model"].(string); ok {
+				model = m
+			}
+
 			// 处理文本内容
 			if content, ok := delta["content"].(string); ok && content != "" {
+				// 在第一个 content_block 之前发送 message_start
+				if !messageStartSent {
+					eventChan <- buildMessageStartEvent(model)
+					messageStartSent = true
+				}
 				// 如果是第一个文本块,发送 content_block_start
 				if !textBlockStarted {
 					startEvent := map[string]interface{}{
@@ -448,6 +461,11 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 
 			// 处理工具调用
 			if toolCalls, ok := delta["tool_calls"].([]interface{}); ok {
+				// 在第一个 content_block 之前发送 message_start
+				if !messageStartSent {
+					eventChan <- buildMessageStartEvent(model)
+					messageStartSent = true
+				}
 				// 如果有文本块正在进行,先关闭它
 				if textBlockStarted {
 					stopEvent := map[string]interface{}{
@@ -520,15 +538,12 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 				}
 
 				if !toolUseStopEmitted && (finishReason == "tool_calls" || finishReason == "function_call") {
-					event := map[string]interface{}{
-						"type": "message_delta",
-						"delta": map[string]string{
-							"stop_reason": "tool_use",
-						},
-					}
-					eventJSON, _ := json.Marshal(event)
-					eventChan <- fmt.Sprintf("event: message_delta\ndata: %s\n\n", eventJSON)
+					stopReason = "tool_use"
 					toolUseStopEmitted = true
+				} else if finishReason == "stop" {
+					stopReason = "end_turn"
+				} else if finishReason == "length" {
+					stopReason = "max_tokens"
 				}
 			}
 		}
@@ -543,6 +558,8 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 			eventChan <- fmt.Sprintf("event: content_block_stop\ndata: %s\n\n", stopJSON)
 		}
 
+		// 发送 message_delta（含 stop_reason）和 message_stop
+		// 注意：必须先检查 scanner 错误，避免流读取异常时发送矛盾的正常结束事件
 		if err := scanner.Err(); err != nil {
 			// 在 tool_use 场景下，客户端主动断开是正常行为
 			// 如果已经发送了 tool_use stop 事件，并且错误是连接断开相关的，则忽略该错误
@@ -554,6 +571,27 @@ func (p *OpenAIProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 				return
 			}
 			errChan <- err
+			return
+		}
+
+		if messageStartSent {
+			if stopReason == "" {
+				stopReason = "end_turn"
+			}
+			deltaEvent := map[string]interface{}{
+				"type": "message_delta",
+				"delta": map[string]string{
+					"stop_reason": stopReason,
+				},
+			}
+			deltaJSON, _ := json.Marshal(deltaEvent)
+			eventChan <- fmt.Sprintf("event: message_delta\ndata: %s\n\n", deltaJSON)
+
+			stopEvent := map[string]interface{}{
+				"type": "message_stop",
+			}
+			stopJSON, _ := json.Marshal(stopEvent)
+			eventChan <- fmt.Sprintf("event: message_stop\ndata: %s\n\n", stopJSON)
 		}
 	}()
 
@@ -565,6 +603,29 @@ type ToolCallAccumulator struct {
 	ID        string
 	Name      string
 	Arguments string
+}
+
+// buildMessageStartEvent 构建 Claude Messages API 的 message_start SSE 事件
+func buildMessageStartEvent(model string) string {
+	if model == "" {
+		model = "unknown"
+	}
+	event := map[string]interface{}{
+		"type": "message_start",
+		"message": map[string]interface{}{
+			"id":      fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+			"type":    "message",
+			"role":    "assistant",
+			"content": []interface{}{},
+			"model":   model,
+			"usage": map[string]int{
+				"input_tokens":  0,
+				"output_tokens": 0,
+			},
+		},
+	}
+	eventJSON, _ := json.Marshal(event)
+	return fmt.Sprintf("event: message_start\ndata: %s\n\n", eventJSON)
 }
 
 // processToolUsePart 处理工具使用部分

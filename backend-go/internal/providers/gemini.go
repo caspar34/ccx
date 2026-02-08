@@ -366,6 +366,8 @@ func (p *GeminiProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 		scanner.Buffer(make([]byte, 0, 64*1024), maxScannerBufferSize)
 
 		toolUseBlockIndex := 0
+		messageStartSent := false
+		stopReason := ""
 
 		// 文本块状态跟踪
 		textBlockStarted := false
@@ -418,6 +420,11 @@ func (p *GeminiProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 
 				// 处理文本
 				if text, ok := part["text"].(string); ok {
+					// 在第一个 content_block 之前发送 message_start
+					if !messageStartSent {
+						eventChan <- buildMessageStartEvent("")
+						messageStartSent = true
+					}
 					// 如果是第一个文本块,发送 content_block_start
 					if !textBlockStarted {
 						startEvent := map[string]interface{}{
@@ -448,6 +455,11 @@ func (p *GeminiProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 
 				// 处理函数调用
 				if fc, ok := part["functionCall"].(map[string]interface{}); ok {
+					// 在第一个 content_block 之前发送 message_start
+					if !messageStartSent {
+						eventChan <- buildMessageStartEvent("")
+						messageStartSent = true
+					}
 					// 如果有文本块正在进行,先关闭它
 					if textBlockStarted {
 						stopEvent := map[string]interface{}{
@@ -486,14 +498,9 @@ func (p *GeminiProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 				}
 
 				if strings.Contains(strings.ToLower(finishReason), "stop") {
-					event := map[string]interface{}{
-						"type": "message_delta",
-						"delta": map[string]string{
-							"stop_reason": "end_turn",
-						},
-					}
-					eventJSON, _ := json.Marshal(event)
-					eventChan <- fmt.Sprintf("event: message_delta\ndata: %s\n\n", eventJSON)
+					stopReason = "end_turn"
+				} else if strings.Contains(strings.ToLower(finishReason), "max_tokens") || strings.Contains(strings.ToLower(finishReason), "length") {
+					stopReason = "max_tokens"
 				}
 			}
 		}
@@ -508,8 +515,31 @@ func (p *GeminiProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 			eventChan <- fmt.Sprintf("event: content_block_stop\ndata: %s\n\n", stopJSON)
 		}
 
+		// 发送 message_delta（含 stop_reason）和 message_stop
+		// 注意：必须先检查 scanner 错误，避免流读取异常时发送矛盾的正常结束事件
 		if err := scanner.Err(); err != nil {
 			errChan <- err
+			return
+		}
+
+		if messageStartSent {
+			if stopReason == "" {
+				stopReason = "end_turn"
+			}
+			deltaEvent := map[string]interface{}{
+				"type": "message_delta",
+				"delta": map[string]string{
+					"stop_reason": stopReason,
+				},
+			}
+			deltaJSON, _ := json.Marshal(deltaEvent)
+			eventChan <- fmt.Sprintf("event: message_delta\ndata: %s\n\n", deltaJSON)
+
+			msgStopEvent := map[string]interface{}{
+				"type": "message_stop",
+			}
+			msgStopJSON, _ := json.Marshal(msgStopEvent)
+			eventChan <- fmt.Sprintf("event: message_stop\ndata: %s\n\n", msgStopJSON)
 		}
 	}()
 
