@@ -34,5 +34,6 @@ type PersistentRecord struct {
 	OutputTokens        int64     // 输出 Token 数
 	CacheCreationTokens int64     // 缓存创建 Token
 	CacheReadTokens     int64     // 缓存读取 Token
+	Model               string    // 请求模型
 	APIType             string    // "messages"、"responses" 或 "gemini"
 }

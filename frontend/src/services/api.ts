@@ -212,6 +212,42 @@ export interface GlobalStatsHistoryResponse {
   dataPoints: GlobalHistoryDataPoint[]
   summary: GlobalStatsSummary
 }
+// ============== 模型统计类型 ==============
+
+export interface ModelHistoryDataPoint {
+  timestamp: string
+  requestCount: number
+  successCount: number
+  failureCount: number
+  inputTokens: number
+  outputTokens: number
+}
+
+export interface ModelStatsHistoryResponse {
+  models: Record<string, ModelHistoryDataPoint[]>
+  duration: string
+  interval: string
+}
+
+// ============== 渠道日志类型 ==============
+
+export interface ChannelLogEntry {
+  timestamp: string
+  model: string
+  statusCode: number
+  durationMs: number
+  success: boolean
+  keyMask: string
+  baseUrl: string
+  errorInfo: string
+  isRetry: boolean
+}
+
+export interface ChannelLogsResponse {
+  channelIndex: number
+  logs: ChannelLogEntry[]
+}
+
 
 // ============== 渠道实时活跃度类型 ==============
 
@@ -663,6 +699,18 @@ class ApiService {
   async getResponsesGlobalStats(duration: '1h' | '6h' | '24h' | 'today' = '24h'): Promise<GlobalStatsHistoryResponse> {
     return this.request(`/responses/global/stats/history?duration=${duration}`)
   }
+  // ============== 模型统计 API ==============
+
+  async getModelStatsHistory(type: 'messages' | 'responses' | 'gemini', duration: '1h' | '6h' | '24h' | 'today' = '24h'): Promise<ModelStatsHistoryResponse> {
+    return this.request(`/${type}/models/stats/history?duration=${duration}`)
+  }
+
+  // ============== 渠道日志 API ==============
+
+  async getChannelLogs(type: 'messages' | 'responses' | 'gemini', channelId: number): Promise<ChannelLogsResponse> {
+    return this.request(`/${type}/channels/${channelId}/logs`)
+  }
+
 
   // ============== Gemini 渠道管理 API ==============
 

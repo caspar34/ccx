@@ -136,6 +136,9 @@ func handleMultiChannel(
 					}
 					return handleNormalResponse(c, resp, provider, envCfg, startTime, bodyBytes, upstreamCopy, apiKey)
 				},
+				claudeReq.Model,
+				selection.ChannelIndex,
+				channelScheduler.GetChannelLogStore(scheduler.ChannelKindMessages),
 			)
 
 			return common.MultiChannelAttemptResult{
@@ -165,7 +168,7 @@ func handleSingleChannel(
 	claudeReq types.ClaudeRequest,
 	startTime time.Time,
 ) {
-	upstream, err := cfgManager.GetCurrentUpstream()
+	upstream, channelIndex, err := cfgManager.GetCurrentUpstreamWithIndex()
 	if err != nil {
 		c.JSON(503, gin.H{
 			"error": "未配置任何渠道，请先在管理界面添加渠道",
@@ -225,6 +228,9 @@ func handleSingleChannel(
 			}
 			return handleNormalResponse(c, resp, provider, envCfg, startTime, bodyBytes, upstreamCopy, apiKey)
 		},
+		claudeReq.Model,
+		channelIndex,
+		channelScheduler.GetChannelLogStore(scheduler.ChannelKindMessages),
 	)
 	if handled {
 		return

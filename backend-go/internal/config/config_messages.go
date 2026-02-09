@@ -33,6 +33,25 @@ func (cm *ConfigManager) GetCurrentUpstream() (*UpstreamConfig, error) {
 	return &cm.config.Upstream[0], nil
 }
 
+// GetCurrentUpstreamWithIndex 获取当前上游配置及其索引
+func (cm *ConfigManager) GetCurrentUpstreamWithIndex() (*UpstreamConfig, int, error) {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	if len(cm.config.Upstream) == 0 {
+		return nil, 0, fmt.Errorf("未配置任何上游渠道")
+	}
+
+	for i := range cm.config.Upstream {
+		status := cm.config.Upstream[i].Status
+		if status == "" || status == "active" {
+			return &cm.config.Upstream[i], i, nil
+		}
+	}
+
+	return &cm.config.Upstream[0], 0, nil
+}
+
 // AddUpstream 添加上游
 func (cm *ConfigManager) AddUpstream(upstream UpstreamConfig) error {
 	cm.mu.Lock()

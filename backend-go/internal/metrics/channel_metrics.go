@@ -14,6 +14,7 @@ import (
 
 // RequestRecord 带时间戳的请求记录（扩展版，支持 Token 和 Cache 数据）
 type RequestRecord struct {
+	Model                    string
 	Timestamp                time.Time
 	Success                  bool
 	InputTokens              int64
@@ -181,6 +182,7 @@ func (m *MetricsManager) loadFromStore() error {
 
 		// 重建请求历史
 		metrics.requestHistory = append(metrics.requestHistory, RequestRecord{
+			Model:                    r.Model,
 			Timestamp:                r.Timestamp,
 			Success:                  r.Success,
 			InputTokens:              r.InputTokens,
@@ -389,12 +391,12 @@ func (m *MetricsManager) recordFailureLocked(baseURL, apiKey string, now time.Ti
 
 // RecordRequestConnected 记录“开始发起上游请求（TCP 建连阶段）”的请求（用于更实时的活跃度统计）。
 // 返回 requestID，用于后续在请求结束时回写成功/失败与 token。
-func (m *MetricsManager) RecordRequestConnected(baseURL, apiKey string) uint64 {
-	return m.RecordRequestConnectedAt(baseURL, apiKey, time.Now())
+func (m *MetricsManager) RecordRequestConnected(baseURL, apiKey string, model string) uint64 {
+	return m.RecordRequestConnectedAt(baseURL, apiKey, model, time.Now())
 }
 
 // RecordRequestConnectedAt 与 RecordRequestConnected 相同，但允许注入时间戳（用于测试）。
-func (m *MetricsManager) RecordRequestConnectedAt(baseURL, apiKey string, timestamp time.Time) uint64 {
+func (m *MetricsManager) RecordRequestConnectedAt(baseURL, apiKey string, model string, timestamp time.Time) uint64 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -411,6 +413,7 @@ func (m *MetricsManager) RecordRequestConnectedAt(baseURL, apiKey string, timest
 	metrics.requestHistory = append(metrics.requestHistory, RequestRecord{
 		Timestamp: timestamp,
 		Success:   true, // 先按成功计数；结束时会回写真实结果
+		Model:     model,
 	})
 	metrics.pendingHistoryIdx[requestID] = len(metrics.requestHistory) - 1
 
@@ -490,6 +493,7 @@ func (m *MetricsManager) RecordRequestFinalizeSuccess(baseURL, apiKey string, re
 			CacheCreationTokens: cacheCreationTokens,
 			CacheReadTokens:     cacheReadTokens,
 			APIType:             m.apiType,
+			Model:               record.Model,
 		})
 	}
 }
@@ -551,6 +555,7 @@ func (m *MetricsManager) RecordRequestFinalizeFailure(baseURL, apiKey string, re
 			CacheCreationTokens: 0,
 			CacheReadTokens:     0,
 			APIType:             m.apiType,
+			Model:               record.Model,
 		})
 	}
 }
@@ -2592,4 +2597,87 @@ func (m *MetricsManager) GetRecentActivityMultiURL(channelIndex int, baseURLs []
 		RPM:          rpm,
 		TPM:          tpm,
 	}
+}
+
+// ModelHistoryDataPoint 模型级别历史数据点
+type ModelHistoryDataPoint struct {
+	Timestamp    time.Time `json:"timestamp"`
+	RequestCount int64     `json:"requestCount"`
+	SuccessCount int64     `json:"successCount"`
+	FailureCount int64     `json:"failureCount"`
+	InputTokens  int64     `json:"inputTokens"`
+	OutputTokens int64     `json:"outputTokens"`
+}
+
+// GetModelStatsHistory 获取按模型分组的历史统计
+func (m *MetricsManager) GetModelStatsHistory(duration, interval time.Duration) map[string][]ModelHistoryDataPoint {
+	if interval <= 0 || duration <= 0 {
+		return map[string][]ModelHistoryDataPoint{}
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	now := time.Now()
+	startTime := now.Add(-duration).Truncate(interval)
+	endTime := now.Truncate(interval).Add(interval)
+	numPoints := int(duration/interval) + 1
+
+	// 按模型分组收集记录
+	type modelBucket struct {
+		requestCount int64
+		successCount int64
+		failureCount int64
+		inputTokens  int64
+		outputTokens int64
+	}
+	// model -> bucketIndex -> data
+	modelBuckets := make(map[string][]modelBucket)
+
+	for _, metrics := range m.keyMetrics {
+		for _, record := range metrics.requestHistory {
+			if record.Timestamp.Before(startTime) || !record.Timestamp.Before(endTime) {
+				continue
+			}
+			model := record.Model
+			if model == "" {
+				continue // 跳过没有模型信息的记录
+			}
+			offset := int(record.Timestamp.Sub(startTime) / interval)
+			if offset < 0 || offset >= numPoints {
+				continue
+			}
+			if _, ok := modelBuckets[model]; !ok {
+				modelBuckets[model] = make([]modelBucket, numPoints)
+			}
+			b := &modelBuckets[model][offset]
+			b.requestCount++
+			if record.Success {
+				b.successCount++
+			} else {
+				b.failureCount++
+			}
+			b.inputTokens += record.InputTokens
+			b.outputTokens += record.OutputTokens
+		}
+	}
+
+	// 构建结果
+	result := make(map[string][]ModelHistoryDataPoint, len(modelBuckets))
+	for model, buckets := range modelBuckets {
+		points := make([]ModelHistoryDataPoint, numPoints)
+		for i := 0; i < numPoints; i++ {
+			points[i] = ModelHistoryDataPoint{
+				Timestamp:    startTime.Add(time.Duration(i) * interval),
+				RequestCount: buckets[i].requestCount,
+				SuccessCount: buckets[i].successCount,
+				FailureCount: buckets[i].failureCount,
+				InputTokens:  buckets[i].inputTokens,
+				OutputTokens: buckets[i].outputTokens,
+			}
+		}
+		result[model] = points
+	}
+
+	return result
 }

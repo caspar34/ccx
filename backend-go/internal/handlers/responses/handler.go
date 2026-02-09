@@ -135,6 +135,9 @@ func handleMultiChannel(
 				func(c *gin.Context, resp *http.Response, upstreamCopy *config.UpstreamConfig, apiKey string) (*types.Usage, error) {
 					return handleSuccess(c, resp, provider, upstream.ServiceType, envCfg, sessionManager, startTime, &responsesReq, bodyBytes)
 				},
+				responsesReq.Model,
+				selection.ChannelIndex,
+				channelScheduler.GetChannelLogStore(scheduler.ChannelKindResponses),
 			)
 
 			return common.MultiChannelAttemptResult{
@@ -165,7 +168,7 @@ func handleSingleChannel(
 	responsesReq types.ResponsesRequest,
 	startTime time.Time,
 ) {
-	upstream, err := cfgManager.GetCurrentResponsesUpstream()
+	upstream, channelIndex, err := cfgManager.GetCurrentResponsesUpstreamWithIndex()
 	if err != nil {
 		c.JSON(503, gin.H{
 			"error": "未配置任何 Responses 渠道，请先在管理界面添加渠道",
@@ -218,6 +221,9 @@ func handleSingleChannel(
 		func(c *gin.Context, resp *http.Response, upstreamCopy *config.UpstreamConfig, apiKey string) (*types.Usage, error) {
 			return handleSuccess(c, resp, provider, upstream.ServiceType, envCfg, sessionManager, startTime, &responsesReq, bodyBytes)
 		},
+		responsesReq.Model,
+		channelIndex,
+		channelScheduler.GetChannelLogStore(scheduler.ChannelKindResponses),
 	)
 	if handled {
 		return

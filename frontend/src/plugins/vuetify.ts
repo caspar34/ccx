@@ -103,6 +103,8 @@ import {
   mdiSignature,
   mdiArrowCollapseUp,
   mdiArrowCollapseDown,
+  mdiHistory,
+  mdiFormatListBulleted,
 } from '@mdi/js'
 
 // 图标名称到 SVG path 的映射 (使用 kebab-case)
@@ -259,6 +261,10 @@ const iconMap: Record<string, string> = {
   // 置顶/置底操作
   'arrow-collapse-up': mdiArrowCollapseUp,
   'arrow-collapse-down': mdiArrowCollapseDown,
+
+  // 日志与历史
+  'history': mdiHistory,
+  'format-list-bulleted': mdiFormatListBulleted,
 }
 
 // 自定义 SVG iconset - 处理 mdi-xxx 字符串格式

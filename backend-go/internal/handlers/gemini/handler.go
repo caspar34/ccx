@@ -173,6 +173,9 @@ func handleMultiChannel(
 				func(c *gin.Context, resp *http.Response, upstreamCopy *config.UpstreamConfig, apiKey string) (*types.Usage, error) {
 					return handleSuccess(c, resp, upstreamCopy.ServiceType, envCfg, startTime, geminiReq, model, isStream)
 				},
+				model,
+				selection.ChannelIndex,
+				channelScheduler.GetChannelLogStore(scheduler.ChannelKindGemini),
 			)
 
 			return common.MultiChannelAttemptResult{
@@ -204,7 +207,7 @@ func handleSingleChannel(
 	isStream bool,
 	startTime time.Time,
 ) {
-	upstream, err := cfgManager.GetCurrentGeminiUpstream()
+	upstream, channelIndex, err := cfgManager.GetCurrentGeminiUpstreamWithIndex()
 	if err != nil {
 		c.JSON(503, types.GeminiError{
 			Error: types.GeminiErrorDetail{
@@ -257,6 +260,9 @@ func handleSingleChannel(
 		func(c *gin.Context, resp *http.Response, upstreamCopy *config.UpstreamConfig, apiKey string) (*types.Usage, error) {
 			return handleSuccess(c, resp, upstreamCopy.ServiceType, envCfg, startTime, geminiReq, model, isStream)
 		},
+		model,
+		channelIndex,
+		channelScheduler.GetChannelLogStore(scheduler.ChannelKindGemini),
 	)
 	if handled {
 		return

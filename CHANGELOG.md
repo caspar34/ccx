@@ -4,6 +4,26 @@
 
 ---
 
+## [Unreleased]
+
+### 新增
+
+- **模型维度使用统计** - 新增按模型分组的请求量和 Token 消耗时间序列统计
+  - `RequestRecord` 和 `PersistentRecord` 新增 `Model` 字段，记录每次请求的模型名
+  - SQLite schema migration（user_version 0→1）自动添加 `model` 列和索引
+  - 新增 `GET /api/{messages|responses|gemini}/models/stats/history` API，返回按模型分组的历史数据点
+  - 前端新增 `ModelStatsChart.vue` 多曲线面积图组件，支持请求量/Token 双视图切换
+  - 集成到 `App.vue` 全局统计区域，与 GlobalStatsChart 并列展示
+
+- **渠道快速日志** - 新增渠道级别的请求日志查看功能（内存环形缓冲区，每渠道保留最近 50 条）
+  - 新增 `ChannelLogStore` 内存环形缓冲区，按 channelIndex 存储，纯内存，重启丢失
+  - `TryUpstreamWithAllKeys` 在每次上游尝试后自动采集日志（含状态码、耗时、错误摘要、是否重试）
+  - 新增 `GET /api/{messages|responses|gemini}/channels/:id/logs` API
+  - 前端新增 `ChannelLogsDialog.vue` 弹窗组件，支持状态码颜色标识、展开错误详情、3 秒自动刷新
+  - 渠道操作菜单新增"日志"入口（mdi-history 图标）
+
+---
+
 ## [v2.6.5] - 2026-02-08
 
 ### 修复

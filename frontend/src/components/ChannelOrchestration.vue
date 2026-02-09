@@ -291,6 +291,12 @@
                     </template>
                     <v-list-item-title>测试延迟</v-list-item-title>
                   </v-list-item>
+                  <v-list-item @click="openLogsDialog(element)">
+                    <template #prepend>
+                      <v-icon size="small">mdi-history</v-icon>
+                    </template>
+                    <v-list-item-title>日志</v-list-item-title>
+                  </v-list-item>
                   <v-list-item @click="copyChannelInfo(element)">
                     <template #prepend>
                       <v-icon size="small">mdi-content-copy</v-icon>
@@ -473,6 +479,13 @@
 
       <div v-else class="text-center py-4 text-medium-emphasis text-caption">所有渠道都处于活跃状态</div>
     </div>
+    <!-- 渠道日志对话框 -->
+    <ChannelLogsDialog
+      v-model="showLogsDialog"
+      :channel-index="logsChannelIndex"
+      :channel-name="logsChannelName"
+      :channel-type="channelType"
+    />
   </v-card>
 </template>
 
@@ -482,6 +495,7 @@ import draggable from 'vuedraggable'
 import { api, type Channel, type ChannelMetrics, type ChannelStatus, type TimeWindowStats, type ChannelRecentActivity } from '../services/api'
 import ChannelStatusBadge from './ChannelStatusBadge.vue'
 import KeyTrendChart from './KeyTrendChart.vue'
+import ChannelLogsDialog from './ChannelLogsDialog.vue'
 
 const props = defineProps<{
   channels: Channel[]
@@ -524,6 +538,16 @@ const schedulerStats = ref<{
 } | null>(null)
 const isLoadingMetrics = ref(false)
 const isSavingOrder = ref(false)
+
+// 渠道日志对话框状态
+const showLogsDialog = ref(false)
+const logsChannelIndex = ref(0)
+const logsChannelName = ref('')
+const openLogsDialog = (ch: Channel) => {
+  logsChannelIndex.value = ch.index
+  logsChannelName.value = ch.name
+  showLogsDialog.value = true
+}
 
 // 延迟测试结果有效期（5 分钟）
 const LATENCY_VALID_DURATION = 5 * 60 * 1000

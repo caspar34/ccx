@@ -134,8 +134,32 @@ func initSchema(db *sql.DB) error {
 			ON request_records(metrics_key);
 	`
 
-	_, err := db.Exec(schema)
-	return err
+	if _, err := db.Exec(schema); err != nil {
+		return err
+	}
+
+	// 版本迁移：使用 user_version PRAGMA 检测 schema 版本
+	var version int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		return err
+	}
+
+	if version < 1 {
+		// v0 -> v1: 添加 model 列
+		migrations := []string{
+			"ALTER TABLE request_records ADD COLUMN model TEXT DEFAULT ''",
+			"CREATE INDEX IF NOT EXISTS idx_records_model ON request_records(model)",
+			"PRAGMA user_version = 1",
+		}
+		for _, sql := range migrations {
+			if _, err := db.Exec(sql); err != nil {
+				return fmt.Errorf("migration v0->v1 failed: %w", err)
+			}
+		}
+		log.Printf("[SQLite-Migration] schema 升级: v0 -> v1 (添加 model 列)")
+	}
+
+	return nil
 }
 
 // AddRecord 添加记录到写入缓冲区（非阻塞）
@@ -203,8 +227,8 @@ func (s *SQLiteStore) batchInsertRecords(records []PersistentRecord) error {
 	stmt, err := tx.Prepare(`
 		INSERT INTO request_records
 		(metrics_key, base_url, key_mask, timestamp, success,
-		 input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, api_type)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, api_type, model)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -218,7 +242,7 @@ func (s *SQLiteStore) batchInsertRecords(records []PersistentRecord) error {
 		}
 		_, err := stmt.Exec(
 			r.MetricsKey, r.BaseURL, r.KeyMask, r.Timestamp.Unix(), success,
-			r.InputTokens, r.OutputTokens, r.CacheCreationTokens, r.CacheReadTokens, r.APIType,
+			r.InputTokens, r.OutputTokens, r.CacheCreationTokens, r.CacheReadTokens, r.APIType, r.Model,
 		)
 		if err != nil {
 			return err
@@ -232,7 +256,7 @@ func (s *SQLiteStore) batchInsertRecords(records []PersistentRecord) error {
 func (s *SQLiteStore) LoadRecords(since time.Time, apiType string) ([]PersistentRecord, error) {
 	rows, err := s.db.Query(`
 		SELECT metrics_key, base_url, key_mask, timestamp, success,
-		       input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens
+		       input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, model
 		FROM request_records
 		WHERE timestamp >= ? AND api_type = ?
 		ORDER BY timestamp ASC
@@ -250,7 +274,7 @@ func (s *SQLiteStore) LoadRecords(since time.Time, apiType string) ([]Persistent
 
 		err := rows.Scan(
 			&r.MetricsKey, &r.BaseURL, &r.KeyMask, &ts, &success,
-			&r.InputTokens, &r.OutputTokens, &r.CacheCreationTokens, &r.CacheReadTokens,
+			&r.InputTokens, &r.OutputTokens, &r.CacheCreationTokens, &r.CacheReadTokens, &r.Model,
 		)
 		if err != nil {
 			return nil, err
