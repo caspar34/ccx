@@ -65,7 +65,19 @@ echo "v{新版本号}" > VERSION
 
 ### 4. 更新 CHANGELOG.md
 
-将 `[Unreleased]` 替换为新版本号和当前日期：
+**前置检查（必须）：**
+
+1. 读取 CHANGELOG.md，查找 `## [Unreleased]` 区块
+2. 检查该区块下是否有实际变更内容（即 `## [Unreleased]` 与下一个 `## [v` 之间是否存在非空行）
+3. 根据检查结果决定行为：
+
+| 情况 | 行为 |
+|------|------|
+| 无 `[Unreleased]` 区块 | ⚠️ 警告用户 CHANGELOG.md 中没有 `[Unreleased]` 区块，询问是否继续（跳过 CHANGELOG 更新） |
+| 有 `[Unreleased]` 但下方无变更内容 | ❌ 中止流程，提示用户先在 `[Unreleased]` 下写入本次版本的变更内容 |
+| 有 `[Unreleased]` 且有变更内容 | ✅ 正常替换 |
+
+**替换规则：**
 
 ```markdown
 # 替换前
