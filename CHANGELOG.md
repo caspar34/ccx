@@ -4,7 +4,7 @@
 
 ---
 
-## [Unreleased]
+## [v2.6.6] - 2026-02-10
 
 ### 新增
 
@@ -21,6 +21,12 @@
   - 新增 `GET /api/{messages|responses|gemini}/channels/:id/logs` API
   - 前端新增 `ChannelLogsDialog.vue` 弹窗组件，支持状态码颜色标识、展开错误详情、3 秒自动刷新
   - 渠道操作菜单新增"日志"入口（mdi-history 图标）
+  - 渠道卡片新增独立日志按钮，与三点菜单并列，方便快速访问
+
+### 修复
+
+- **ModelStatsChart 并发请求竞态** - 使用请求版本号机制，确保只有最新请求的结果会更新数据，旧请求返回时自动丢弃，避免数据闪回
+- **渠道删除后日志串台** - `ChannelLogStore` 新增 `ClearAll` 方法，删除渠道时清空整个日志存储避免索引错位；`DeleteUpstream` handler 传入 `channelScheduler` 参数
 
 ---
 

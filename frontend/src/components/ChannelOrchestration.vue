@@ -264,6 +264,16 @@
                 <v-icon size="small">mdi-refresh</v-icon>
               </v-btn>
 
+              <v-btn
+                icon
+                size="x-small"
+                variant="text"
+                title="查看日志"
+                @click="openLogsDialog(element)"
+              >
+                <v-icon size="small">mdi-history</v-icon>
+              </v-btn>
+
               <v-menu>
                 <template #activator="{ props: menuProps }">
                   <v-btn

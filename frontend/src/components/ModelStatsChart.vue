@@ -183,17 +183,28 @@ const chartOptions = computed<ApexOptions>(() => ({
   }
 }))
 
+let requestVersion = 0
 const refreshData = async (silent = false) => {
+  if (!silent) stopAutoRefresh()
+  const currentVersion = ++requestVersion
   if (!silent) isLoading.value = true
   try {
-    historyData.value = await api.getModelStatsHistory(props.apiType, selectedDuration.value)
+    const data = await api.getModelStatsHistory(props.apiType, selectedDuration.value)
+    if (currentVersion === requestVersion) {
+      historyData.value = data
+    }
   } catch (e) {
-    console.error('Failed to fetch model stats:', e)
-    errorMessage.value = e instanceof Error ? e.message : '获取模型统计数据失败'
-    showError.value = true
-    historyData.value = null
+    if (currentVersion === requestVersion && !silent) {
+      console.error('Failed to fetch model stats:', e)
+      errorMessage.value = e instanceof Error ? e.message : '获取模型统计数据失败'
+      showError.value = true
+      historyData.value = null
+    }
   } finally {
-    if (!silent) isLoading.value = false
+    if (currentVersion === requestVersion && !silent) {
+      isLoading.value = false
+      startAutoRefresh()
+    }
   }
 }
 
@@ -201,7 +212,7 @@ const refreshData = async (silent = false) => {
 let timer: ReturnType<typeof setInterval> | null = null
 const startAutoRefresh = () => {
   stopAutoRefresh()
-  timer = setInterval(() => { if (!isLoading.value) refreshData(true) }, 2000)
+  timer = setInterval(() => refreshData(true), 2000)
 }
 const stopAutoRefresh = () => { if (timer) { clearInterval(timer); timer = null } }
 
@@ -214,7 +225,7 @@ watch(() => props.apiType, (t) => {
   refreshData()
 })
 
-onMounted(() => { refreshData(); startAutoRefresh() })
+onMounted(() => { refreshData() })
 onUnmounted(() => { stopAutoRefresh() })
 </script>
 

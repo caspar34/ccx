@@ -39,6 +39,13 @@ func (s *ChannelLogStore) Record(channelIndex int, log *ChannelLog) {
 	}
 }
 
+// ClearAll 清除所有渠道日志（渠道删除导致索引变化时调用）
+func (s *ChannelLogStore) ClearAll() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logs = make(map[int][]*ChannelLog)
+}
+
 func (s *ChannelLogStore) Get(channelIndex int) []*ChannelLog {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

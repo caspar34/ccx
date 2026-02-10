@@ -96,7 +96,7 @@ func UpdateUpstream(cfgManager *config.ConfigManager, sch *scheduler.ChannelSche
 }
 
 // DeleteUpstream 删除 Responses 上游
-func DeleteUpstream(cfgManager *config.ConfigManager) gin.HandlerFunc {
+func DeleteUpstream(cfgManager *config.ConfigManager, channelScheduler *scheduler.ChannelScheduler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
@@ -114,6 +114,8 @@ func DeleteUpstream(cfgManager *config.ConfigManager) gin.HandlerFunc {
 			}
 			return
 		}
+
+		channelScheduler.GetChannelLogStore(scheduler.ChannelKindResponses).ClearAll()
 
 		c.JSON(200, gin.H{"message": "Responses upstream deleted successfully"})
 	}

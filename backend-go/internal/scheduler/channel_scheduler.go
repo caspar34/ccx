@@ -16,13 +16,13 @@ import (
 
 // ChannelScheduler 多渠道调度器
 type ChannelScheduler struct {
-	mu                      sync.RWMutex
-	configManager           *config.ConfigManager
-	messagesMetricsManager  *metrics.MetricsManager // Messages 渠道指标
-	responsesMetricsManager *metrics.MetricsManager // Responses 渠道指标
-	geminiMetricsManager    *metrics.MetricsManager // Gemini 渠道指标
-	traceAffinity           *session.TraceAffinityManager
-	urlManager                *warmup.URLManager       // URL 管理器（非阻塞，动态排序）
+	mu                       sync.RWMutex
+	configManager            *config.ConfigManager
+	messagesMetricsManager   *metrics.MetricsManager // Messages 渠道指标
+	responsesMetricsManager  *metrics.MetricsManager // Responses 渠道指标
+	geminiMetricsManager     *metrics.MetricsManager // Gemini 渠道指标
+	traceAffinity            *session.TraceAffinityManager
+	urlManager               *warmup.URLManager       // URL 管理器（非阻塞，动态排序）
 	messagesChannelLogStore  *metrics.ChannelLogStore // Messages 渠道请求日志
 	responsesChannelLogStore *metrics.ChannelLogStore // Responses 渠道请求日志
 	geminiChannelLogStore    *metrics.ChannelLogStore // Gemini 渠道请求日志
@@ -49,12 +49,12 @@ func NewChannelScheduler(
 	urlMgr *warmup.URLManager,
 ) *ChannelScheduler {
 	return &ChannelScheduler{
-		configManager:           cfgManager,
-		messagesMetricsManager:  messagesMetrics,
-		responsesMetricsManager: responsesMetrics,
-		geminiMetricsManager:    geminiMetrics,
-		traceAffinity:           traceAffinity,
-		urlManager:              urlMgr,
+		configManager:            cfgManager,
+		messagesMetricsManager:   messagesMetrics,
+		responsesMetricsManager:  responsesMetrics,
+		geminiMetricsManager:     geminiMetrics,
+		traceAffinity:            traceAffinity,
+		urlManager:               urlMgr,
 		messagesChannelLogStore:  metrics.NewChannelLogStore(),
 		responsesChannelLogStore: metrics.NewChannelLogStore(),
 		geminiChannelLogStore:    metrics.NewChannelLogStore(),
