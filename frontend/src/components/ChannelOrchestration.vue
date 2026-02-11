@@ -839,19 +839,48 @@ const activityMap = computed(() => {
 })
 
 // 每个渠道的历史最大请求数（用于固定柱状图高度比例）
-const maxRequestsHistory = ref(new Map<number, number>())
+// 结构：{ max: number, updatedAt: number }
+const maxRequestsHistory = ref(new Map<number, { max: number; updatedAt: number }>())
 
-// 更新历史最大值
+// 指数衰减参数
+const DECAY_HALF_LIFE = 5 * 60 * 1000  // 半衰期 5 分钟
+const MIN_MAX_REQUESTS = 1  // 最小基准值，避免除零
+
+// 计算衰减后的历史最大值
+const getDecayedMax = (record: { max: number; updatedAt: number }, now: number): number => {
+  const elapsed = now - record.updatedAt
+  // 指数衰减：max * 0.5^(elapsed / halfLife)
+  const decayFactor = Math.pow(0.5, elapsed / DECAY_HALF_LIFE)
+  return Math.max(record.max * decayFactor, MIN_MAX_REQUESTS)
+}
+
+// 更新历史最大值（带指数衰减）
 watch(activityMap, (newMap) => {
+  const now = Date.now()
+
   for (const [channelIndex, activity] of newMap.entries()) {
     if (!activity.segments || activity.segments.length === 0) continue
 
     const currentMax = Math.max(...activity.segments.map(s => s.requestCount), 0)
-    const historicalMax = maxRequestsHistory.value.get(channelIndex) ?? 0
+    const record = maxRequestsHistory.value.get(channelIndex)
 
-    // 只在当前最大值更大时更新（保持历史峰值）
-    if (currentMax > historicalMax) {
-      maxRequestsHistory.value.set(channelIndex, currentMax)
+    if (!record) {
+      // 首次记录
+      if (currentMax > 0) {
+        maxRequestsHistory.value.set(channelIndex, { max: currentMax, updatedAt: now })
+      }
+      continue
+    }
+
+    // 计算衰减后的历史最大值
+    const decayedMax = getDecayedMax(record, now)
+
+    if (currentMax >= decayedMax) {
+      // 当前值超过衰减后的历史值，更新为当前值
+      maxRequestsHistory.value.set(channelIndex, { max: currentMax, updatedAt: now })
+    } else {
+      // 当前值较小，保持衰减后的值（更新时间戳以继续衰减）
+      maxRequestsHistory.value.set(channelIndex, { max: decayedMax, updatedAt: now })
     }
   }
 })
@@ -882,8 +911,11 @@ const activityBarsCache = computed(() => {
     const barGap = barWidth * 0.2  // 20% 间隙
     const actualBarWidth = barWidth - barGap
 
-    // 使用历史最大值作为归一化基准（避免高流量段离开后柱子突然变高）
-    const maxRequests = maxRequestsHistory.value.get(channelIndex) ?? Math.max(...segments.map(s => s.requestCount), 1)
+    // 使用衰减后的历史最大值作为归一化基准
+    const now = Date.now()
+    const record = maxRequestsHistory.value.get(channelIndex)
+    const currentMax = Math.max(...segments.map(s => s.requestCount), 1)
+    const maxRequests = record ? Math.max(getDecayedMax(record, now), currentMax) : currentMax
 
     const bars: Array<{ x: number; y: number; width: number; height: number; radius: number; color: string }> = []
 
