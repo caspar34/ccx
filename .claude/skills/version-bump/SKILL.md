@@ -105,10 +105,24 @@ git diff --stat
 
 ### 7. 提交变更
 
-询问用户确认提交信息后执行：
+**检查工作区状态：**
+
+1. 如果工作区有未提交的修改（除 VERSION 和 CHANGELOG.md 外），询问用户：
+   - "检测到工作区有其他未提交的修改，是否一并提交？(Y/n)"
+   - 如果用户选择 Y（默认），使用 `git add -A` 提交所有修改
+   - 如果用户选择 N，仅提交 VERSION 和 CHANGELOG.md
+
+2. 提交信息规则：
+   - 如果仅提交版本文件：`chore: bump version to v{新版本号}`
+   - 如果包含其他修改：让用户提供提交信息，或使用默认格式
 
 ```bash
+# 包含所有修改
 git add -A
+git commit -m "{用户确认的提交信息}"
+
+# 或仅提交版本文件
+git add VERSION CHANGELOG.md
 git commit -m "chore: bump version to v{新版本号}"
 ```
 
@@ -256,7 +270,7 @@ concurrency:
 
 - 版本号格式为 `v{x}.{y}.{z}`（无后缀）
 - 提交前会显示所有待提交的变更供用户确认
-- 如果有其他未提交的变更，会一并提交
+- 如果工作区有其他未提交的修改，会询问用户是否一并提交
 - 遵循 Conventional Commits 规范，使用 `chore: bump version` 格式
 - 推送 tag 后，GitHub Actions 需要几分钟完成编译和发布
 - 可以在 GitHub Actions 页面查看构建进度
