@@ -122,6 +122,15 @@ watch(() => props.modelValue, (open) => {
   }
 })
 
+// 对话框打开状态下切换渠道时重新加载
+watch([() => props.channelIndex, () => props.channelType], () => {
+  if (props.modelValue) {
+    logs.value = []
+    expandedIndex.value = null
+    fetchLogs()
+  }
+})
+
 watch(autoRefresh, (v) => {
   if (v && props.modelValue) startPolling()
   else stopPolling()

@@ -126,10 +126,10 @@ func TryUpstreamWithAllKeys(
 
 			req, err := buildRequest(c, upstreamCopy, apiKey)
 			if err != nil {
-				lastError = err
-				failedKeys[apiKey] = true
-				channelScheduler.RecordFailure(currentBaseURL, apiKey, kind)
-				continue
+				// buildRequest 失败通常是客户端参数问题或本地构建错误
+				// 不应污染熔断统计，直接返回错误
+				log.Printf("[%s-BuildRequest] 请求构建失败: %v", apiType, err)
+				return false, "", 0, nil, nil, fmt.Errorf("request build failed: %w", err)
 			}
 
 			// 记录请求开始

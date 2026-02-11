@@ -2615,14 +2615,25 @@ func (m *MetricsManager) GetModelStatsHistory(duration, interval time.Duration) 
 		return map[string][]ModelHistoryDataPoint{}
 	}
 
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	now := time.Now()
 	startTime := now.Add(-duration).Truncate(interval)
 	endTime := now.Truncate(interval).Add(interval)
 	numPoints := int(duration/interval) + 1
 
+	// 快速拷贝 requestHistory 引用，缩短持锁时间
+	type historyRef struct {
+		history []RequestRecord
+	}
+	var historyRefs []historyRef
+
+	m.mu.RLock()
+	for _, metrics := range m.keyMetrics {
+		// 拷贝 slice 引用（底层数组共享，但遍历时不会修改）
+		historyRefs = append(historyRefs, historyRef{history: metrics.requestHistory})
+	}
+	m.mu.RUnlock()
+
+	// 解锁后进行聚合计算
 	// 按模型分组收集记录
 	type modelBucket struct {
 		requestCount int64
@@ -2634,8 +2645,8 @@ func (m *MetricsManager) GetModelStatsHistory(duration, interval time.Duration) 
 	// model -> bucketIndex -> data
 	modelBuckets := make(map[string][]modelBucket)
 
-	for _, metrics := range m.keyMetrics {
-		for _, record := range metrics.requestHistory {
+	for _, ref := range historyRefs {
+		for _, record := range ref.history {
 			if record.Timestamp.Before(startTime) || !record.Timestamp.Before(endTime) {
 				continue
 			}

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -33,6 +34,7 @@ type SQLiteStore struct {
 	closed       bool           // 是否已关闭
 	flushMu      sync.Mutex     // 串行化 flush 与 delete 操作，避免并发竞态
 	asyncFlushWg sync.WaitGroup // 追踪 AddRecord 触发的异步 flush goroutine
+	flushing     atomic.Bool    // 原子标记：是否有 flush goroutine 正在运行/排队
 }
 
 // SQLiteStoreConfig SQLite 存储配置
@@ -173,10 +175,13 @@ func (s *SQLiteStore) AddRecord(record PersistentRecord) {
 	shouldFlush := len(s.writeBuffer) >= s.batchSize
 	s.bufferMu.Unlock()
 
-	if shouldFlush {
+	// 使用原子标记确保同一时间只有一个 flush goroutine 被调度
+	// 避免高并发下产生大量 goroutine 排队等待 flushMu
+	if shouldFlush && s.flushing.CompareAndSwap(false, true) {
 		s.asyncFlushWg.Add(1)
 		go func() {
 			defer s.asyncFlushWg.Done()
+			defer s.flushing.Store(false)
 			// 获取 flush 锁，与 DeleteRecordsByMetricsKeys 串行化
 			s.flushMu.Lock()
 			s.flush()

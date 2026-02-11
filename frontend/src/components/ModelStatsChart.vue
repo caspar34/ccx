@@ -212,7 +212,7 @@ const refreshData = async (silent = false) => {
 let timer: ReturnType<typeof setInterval> | null = null
 const startAutoRefresh = () => {
   stopAutoRefresh()
-  timer = setInterval(() => refreshData(true), 2000)
+  timer = setInterval(() => refreshData(true), 5000) // 5s 轮询，降低锁竞争
 }
 const stopAutoRefresh = () => { if (timer) { clearInterval(timer); timer = null } }
 
