@@ -213,6 +213,7 @@ export interface GlobalStatsSummary {
 export interface GlobalStatsHistoryResponse {
   dataPoints: GlobalHistoryDataPoint[]
   summary: GlobalStatsSummary
+  modelDataPoints?: Record<string, ModelHistoryDataPoint[]>
 }
 // ============== 模型统计类型 ==============
 

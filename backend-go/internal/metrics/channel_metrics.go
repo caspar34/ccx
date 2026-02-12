@@ -2305,10 +2305,14 @@ func (m *MetricsManager) GetKeyHistoricalStatsMultiURL(baseURLs []string, apiKey
 
 // KeyModelHistoryDataPoint Key+Model 组合的历史数据点
 type KeyModelHistoryDataPoint struct {
-	Timestamp    time.Time `json:"timestamp"`
-	RequestCount int64     `json:"requestCount"`
-	SuccessCount int64     `json:"successCount"`
-	FailureCount int64     `json:"failureCount"`
+	Timestamp                time.Time `json:"timestamp"`
+	RequestCount             int64     `json:"requestCount"`
+	SuccessCount             int64     `json:"successCount"`
+	FailureCount             int64     `json:"failureCount"`
+	InputTokens              int64     `json:"inputTokens"`
+	OutputTokens             int64     `json:"outputTokens"`
+	CacheCreationInputTokens int64     `json:"cacheCreationTokens"`
+	CacheReadInputTokens     int64     `json:"cacheReadTokens"`
 }
 
 // GetKeyModelHistoricalStatsMultiURL 获取单个 Key 按模型分组的历史数据
@@ -2356,6 +2360,10 @@ func (m *MetricsManager) GetKeyModelHistoricalStatsMultiURL(baseURLs []string, a
 					} else {
 						b.failureCount++
 					}
+					b.inputTokens += record.InputTokens
+					b.outputTokens += record.OutputTokens
+					b.cacheCreationTokens += record.CacheCreationInputTokens
+					b.cacheReadTokens += record.CacheReadInputTokens
 				}
 			}
 		}
@@ -2368,10 +2376,14 @@ func (m *MetricsManager) GetKeyModelHistoricalStatsMultiURL(baseURLs []string, a
 		for i := 0; i < numPoints; i++ {
 			b := buckets[int64(i)]
 			points[i] = KeyModelHistoryDataPoint{
-				Timestamp:    startTime.Add(time.Duration(i+1) * interval),
-				RequestCount: b.requestCount,
-				SuccessCount: b.successCount,
-				FailureCount: b.failureCount,
+				Timestamp:                startTime.Add(time.Duration(i+1) * interval),
+				RequestCount:             b.requestCount,
+				SuccessCount:             b.successCount,
+				FailureCount:             b.failureCount,
+				InputTokens:              b.inputTokens,
+				OutputTokens:             b.outputTokens,
+				CacheCreationInputTokens: b.cacheCreationTokens,
+				CacheReadInputTokens:     b.cacheReadTokens,
 			}
 		}
 		result[model] = points
@@ -2421,8 +2433,9 @@ type GlobalStatsSummary struct {
 
 // GlobalStatsHistoryResponse 全局统计响应
 type GlobalStatsHistoryResponse struct {
-	DataPoints []GlobalHistoryDataPoint `json:"dataPoints"`
-	Summary    GlobalStatsSummary       `json:"summary"`
+	DataPoints      []GlobalHistoryDataPoint          `json:"dataPoints"`
+	Summary         GlobalStatsSummary                `json:"summary"`
+	ModelDataPoints map[string][]ModelHistoryDataPoint `json:"modelDataPoints,omitempty"`
 }
 
 // GetGlobalHistoricalStatsWithTokens 获取全局历史统计（包含 Token 数据）
@@ -2461,6 +2474,16 @@ func (m *MetricsManager) GetGlobalHistoricalStatsWithTokens(duration, interval t
 	var totalRequests, totalSuccess, totalFailure int64
 	var totalInputTokens, totalOutputTokens, totalCacheCreation, totalCacheRead int64
 
+	// 按模型分桶（复用 modelBucket 结构）
+	type modelBucket struct {
+		requestCount int64
+		successCount int64
+		failureCount int64
+		inputTokens  int64
+		outputTokens int64
+	}
+	modelBuckets := make(map[string][]modelBucket)
+
 	// 遍历所有 Key 的请求历史
 	for _, metrics := range m.keyMetrics {
 		for _, record := range metrics.requestHistory {
@@ -2491,6 +2514,22 @@ func (m *MetricsManager) GetGlobalHistoricalStatsWithTokens(duration, interval t
 					totalOutputTokens += record.OutputTokens
 					totalCacheCreation += record.CacheCreationInputTokens
 					totalCacheRead += record.CacheReadInputTokens
+
+					// 同时按模型分桶（跳过无模型信息的记录）
+					if model := record.Model; model != "" {
+						if _, ok := modelBuckets[model]; !ok {
+							modelBuckets[model] = make([]modelBucket, numPoints)
+						}
+						mb := &modelBuckets[model][offset]
+						mb.requestCount++
+						if record.Success {
+							mb.successCount++
+						} else {
+							mb.failureCount++
+						}
+						mb.inputTokens += record.InputTokens
+						mb.outputTokens += record.OutputTokens
+					}
 				}
 			}
 		}
@@ -2535,9 +2574,30 @@ func (m *MetricsManager) GetGlobalHistoricalStatsWithTokens(duration, interval t
 		Duration:                 duration.String(),
 	}
 
+	// 构建模型维度数据点
+	var modelDataPoints map[string][]ModelHistoryDataPoint
+	if len(modelBuckets) > 0 {
+		modelDataPoints = make(map[string][]ModelHistoryDataPoint, len(modelBuckets))
+		for model, buckets := range modelBuckets {
+			points := make([]ModelHistoryDataPoint, numPoints)
+			for i := 0; i < numPoints; i++ {
+				points[i] = ModelHistoryDataPoint{
+					Timestamp:    startTime.Add(time.Duration(i+1) * interval),
+					RequestCount: buckets[i].requestCount,
+					SuccessCount: buckets[i].successCount,
+					FailureCount: buckets[i].failureCount,
+					InputTokens:  buckets[i].inputTokens,
+					OutputTokens: buckets[i].outputTokens,
+				}
+			}
+			modelDataPoints[model] = points
+		}
+	}
+
 	return GlobalStatsHistoryResponse{
-		DataPoints: dataPoints,
-		Summary:    summary,
+		DataPoints:      dataPoints,
+		Summary:         summary,
+		ModelDataPoints: modelDataPoints,
 	}
 }
 

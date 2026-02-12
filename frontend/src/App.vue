@@ -169,7 +169,6 @@
             <div v-if="preferencesStore.showGlobalStats">
               <v-divider />
               <GlobalStatsChart :api-type="channelStore.activeTab" />
-              <ModelStatsChart :api-type="channelStore.activeTab" />
             </div>
           </v-expand-transition>
         </v-card>
@@ -352,7 +351,6 @@ import { useDialogStore } from './stores/dialog'
 import { useSystemStore } from './stores/system'
 import AddChannelModal from './components/AddChannelModal.vue'
 import GlobalStatsChart from './components/GlobalStatsChart.vue'
-import ModelStatsChart from './components/ModelStatsChart.vue'
 import { useAppTheme } from './composables/useTheme'
 
 // Vuetify主题

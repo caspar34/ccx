@@ -98,7 +98,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useTheme } from 'vuetify'
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
-import { api, type GlobalStatsHistoryResponse, type GlobalHistoryDataPoint as _GlobalHistoryDataPoint, type GlobalStatsSummary } from '../services/api'
+import { api, type GlobalStatsHistoryResponse, type GlobalHistoryDataPoint as _GlobalHistoryDataPoint, type GlobalStatsSummary, type ModelHistoryDataPoint } from '../services/api'
 
 // Register apexchart component
 const apexchart = VueApexCharts
@@ -195,6 +195,24 @@ const chartColors = {
   }
 }
 
+// 模型颜色数组
+const modelColors = [
+  '#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ef4444',
+  '#06b6d4', '#ec4899', '#84cc16', '#f59e0b', '#6366f1'
+]
+
+// 按总请求量排序的模型列表
+const sortedModels = computed(() => {
+  const models = historyData.value?.modelDataPoints
+  if (!models) return []
+  return Object.entries(models)
+    .map(([name, points]) => ({ name, points, total: points.reduce((s: number, p: ModelHistoryDataPoint) => s + p.requestCount, 0) }))
+    .sort((a, b) => b.total - a.total)
+})
+
+// 是否有多模型数据（用于判断是否启用堆叠模式）
+const hasMultiModel = computed(() => sortedModels.value.length > 0)
+
 // 失败率阈值：超过此值显示红色背景
 const FAILURE_RATE_THRESHOLD = 0.1 // 10%
 
@@ -273,6 +291,12 @@ const formatNumber = (num: number): string => {
 // Chart options
 const chartOptions = computed<ApexOptions>(() => {
   const mode = selectedView.value
+  const isTrafficMultiModel = mode === 'traffic' && hasMultiModel.value
+
+  // 流量模式颜色：多模型时按模型分配，否则单色
+  const trafficColors = isTrafficMultiModel
+    ? sortedModels.value.map((_, i) => modelColors[i % modelColors.length])
+    : [chartColors.traffic.primary]
 
   return {
     chart: {
@@ -280,6 +304,7 @@ const chartOptions = computed<ApexOptions>(() => {
       zoom: { enabled: false },
       background: 'transparent',
       fontFamily: 'inherit',
+      stacked: isTrafficMultiModel,
       animations: {
         enabled: true,
         speed: 400,
@@ -291,7 +316,7 @@ const chartOptions = computed<ApexOptions>(() => {
       mode: isDark.value ? 'dark' : 'light'
     },
     colors: mode === 'traffic'
-      ? [chartColors.traffic.primary]
+      ? trafficColors
       : [chartColors.tokens.input, chartColors.tokens.output],
     fill: {
       type: 'gradient' as const,
@@ -308,7 +333,7 @@ const chartOptions = computed<ApexOptions>(() => {
     stroke: {
       curve: 'smooth' as const,
       width: 2,
-      dashArray: mode === 'tokens' ? [0, 5] : [0, 0]
+      dashArray: mode === 'tokens' ? [0, 5] : 0
     },
     grid: {
       borderColor: isDark.value ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
@@ -364,7 +389,7 @@ const chartOptions = computed<ApexOptions>(() => {
       xaxis: failureAnnotations.value
     },
     legend: {
-      show: mode === 'tokens',
+      show: mode === 'tokens' || isTrafficMultiModel,
       position: 'top' as const,
       horizontalAlign: 'right' as const,
       fontSize: '11px',
@@ -381,19 +406,55 @@ const buildTrafficTooltip = ({ dataPointIndex }: any): string => {
 
   const date = new Date(dp.timestamp)
   const timeStr = date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  const failureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
   const hasFailure = dp.failureCount > 0
+
+  // HTML 转义函数
+  const escapeHtml = (str: string): string => {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  }
 
   let html = `<div style="padding: 8px 12px; font-size: 12px;">`
   html += `<div style="font-weight: 600; margin-bottom: 6px; color: ${hasFailure ? '#ef4444' : 'inherit'};">${timeStr}</div>`
-  html += `<div style="display: flex; align-items: center; margin: 4px 0;">`
-  html += `<span style="width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></span>`
-  html += `<span style="flex: 1;">总请求</span>`
-  html += `<span style="margin-left: 12px; font-weight: 500;">${dp.requestCount}</span>`
-  html += `</div>`
-  if (hasFailure) {
-    html += `<div style="color: #ef4444; font-size: 11px; margin-top: 4px;">${dp.failureCount} 失败 (${failureRate}%)</div>`
+
+  const models = sortedModels.value
+  if (models.length > 0) {
+    // 多模型模式：显示每个模型的请求数和失败数
+    models.forEach((model, idx) => {
+      const mdp = model.points[dataPointIndex]
+      if (!mdp || mdp.requestCount === 0) return
+      const color = modelColors[idx % modelColors.length]
+      const hasModelFailure = mdp.failureCount > 0
+      const failRate = mdp.requestCount > 0 ? (mdp.failureCount / mdp.requestCount * 100).toFixed(0) : '0'
+      html += `<div style="display: flex; align-items: center; margin: 4px 0;">`
+      html += `<span style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; margin-right: 6px;"></span>`
+      html += `<span style="flex: 1;">${escapeHtml(model.name)}</span>`
+      html += `<span style="margin-left: 12px; font-weight: 500;">${mdp.requestCount}</span>`
+      if (hasModelFailure) {
+        html += `<span style="margin-left: 6px; color: #ef4444; font-size: 11px;">(${mdp.failureCount}失败, ${failRate}%)</span>`
+      }
+      html += `</div>`
+    })
+    // 合计行
+    const grandFailureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
+    html += `<div style="border-top: 1px solid rgba(128,128,128,0.3); margin-top: 6px; padding-top: 6px; font-weight: 600;">`
+    html += `<span>合计: ${dp.requestCount} 请求</span>`
+    if (hasFailure) {
+      html += `<span style="color: #ef4444; margin-left: 8px;">${dp.failureCount} 失败 (${grandFailureRate}%)</span>`
+    }
+    html += `</div>`
+  } else {
+    // 单曲线降级模式
+    const failureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
+    html += `<div style="display: flex; align-items: center; margin: 4px 0;">`
+    html += `<span style="width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></span>`
+    html += `<span style="flex: 1;">总请求</span>`
+    html += `<span style="margin-left: 12px; font-weight: 500;">${dp.requestCount}</span>`
+    html += `</div>`
+    if (hasFailure) {
+      html += `<div style="color: #ef4444; font-size: 11px; margin-top: 4px;">${dp.failureCount} 失败 (${failureRate}%)</div>`
+    }
   }
+
   html += `</div>`
   return html
 }
@@ -406,6 +467,17 @@ const chartSeries = computed(() => {
   const mode = selectedView.value
 
   if (mode === 'traffic') {
+    // 有模型数据时按模型生成多 series，否则降级为单曲线
+    const models = sortedModels.value
+    if (models.length > 0) {
+      return models.map(model => ({
+        name: model.name,
+        data: model.points.map((p: ModelHistoryDataPoint) => ({
+          x: new Date(p.timestamp).getTime(),
+          y: p.requestCount
+        }))
+      }))
+    }
     return [
       {
         name: '请求',
@@ -453,9 +525,12 @@ const refreshData = async (isAutoRefresh = false) => {
     }
 
     // Check if we can use updateSeries for smooth update
+    const oldModels = historyData.value?.modelDataPoints ? Object.keys(historyData.value.modelDataPoints).sort().join(',') : ''
+    const newModels = newData.modelDataPoints ? Object.keys(newData.modelDataPoints).sort().join(',') : ''
     const canUpdateInPlace = isAutoRefresh &&
       chartRef.value &&
-      historyData.value?.dataPoints?.length === newData.dataPoints?.length
+      historyData.value?.dataPoints?.length === newData.dataPoints?.length &&
+      oldModels === newModels
 
     if (canUpdateInPlace) {
       historyData.value = newData

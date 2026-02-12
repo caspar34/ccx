@@ -364,6 +364,7 @@ const chartOptions = computed<ApexOptions>(() => {
       background: 'transparent',
       fontFamily: 'inherit',
       sparkline: { enabled: false },
+      stacked: mode === 'traffic',
       animations: {
         enabled: true,
         speed: 400,
@@ -421,7 +422,11 @@ const chartOptions = computed<ApexOptions>(() => {
       custom: mode === 'traffic' ? buildTrafficTooltip : undefined
     },
     legend: {
-      show: false
+      show: mode === 'traffic',
+      position: 'top' as const,
+      horizontalAlign: 'right' as const,
+      fontSize: '11px',
+      markers: { size: 4 }
     }
   }
 })

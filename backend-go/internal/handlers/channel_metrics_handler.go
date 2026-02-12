@@ -534,11 +534,14 @@ func GetChannelKeyMetricsHistory(metricsManager *metrics.MetricsManager, cfgMana
 					dataPoints := make([]metrics.KeyHistoryDataPoint, len(points))
 					for i, p := range points {
 						dataPoints[i] = metrics.KeyHistoryDataPoint{
-							Timestamp:    p.Timestamp,
-							RequestCount: p.RequestCount,
-							SuccessCount: p.SuccessCount,
-							FailureCount: p.FailureCount,
-							// token/cache 数据在按模型拆分时不可用，前端 tokens/cache 视图应使用聚合数据
+							Timestamp:                p.Timestamp,
+							RequestCount:             p.RequestCount,
+							SuccessCount:             p.SuccessCount,
+							FailureCount:             p.FailureCount,
+							InputTokens:              p.InputTokens,
+							OutputTokens:             p.OutputTokens,
+							CacheCreationInputTokens: p.CacheCreationInputTokens,
+							CacheReadInputTokens:     p.CacheReadInputTokens,
 						}
 					}
 					result.Keys = append(result.Keys, KeyMetricsHistoryResult{
