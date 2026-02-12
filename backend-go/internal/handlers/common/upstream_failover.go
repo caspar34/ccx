@@ -87,6 +87,13 @@ func TryUpstreamWithAllKeys(
 	var lastFailoverError *FailoverError
 	deprioritizeCandidates := make(map[string]bool)
 
+	// 计算重定向后的模型（用于日志记录）
+	redirectedModel := config.RedirectModel(model, upstream)
+	var originalModel string
+	if redirectedModel != model {
+		originalModel = model // 仅当发生重定向时记录原始模型
+	}
+
 	// 强制探测模式：基于本次优先尝试的 BaseURL 判断（避免 BaseURL/BaseURLs 不一致导致误判）
 	forceProbeMode := AreAllKeysSuspended(metricsManager, urlResults[0].URL, upstream.APIKeys)
 	if forceProbeMode {
@@ -136,7 +143,7 @@ func TryUpstreamWithAllKeys(
 			channelScheduler.RecordRequestStart(currentBaseURL, apiKey, kind)
 
 			// TCP 建连开始即计数：将活跃度统计提前到发起上游请求之前
-			requestID := metricsManager.RecordRequestConnected(currentBaseURL, apiKey, model)
+			requestID := metricsManager.RecordRequestConnected(currentBaseURL, apiKey, redirectedModel)
 
 			attemptStart := time.Now()
 			resp, err := SendRequest(req, upstream, envCfg, isStream, apiType)
@@ -165,8 +172,9 @@ func TryUpstreamWithAllKeys(
 						errInfo = errInfo[:200]
 					}
 					channelLogStore.Record(channelIndex, &metrics.ChannelLog{
-						Timestamp:  time.Now(),
-						Model:      model,
+						Timestamp:     time.Now(),
+						Model:         redirectedModel,
+						OriginalModel: originalModel,
 						StatusCode: 0,
 						DurationMs: time.Since(attemptStart).Milliseconds(),
 						Success:    false,
@@ -209,8 +217,9 @@ func TryUpstreamWithAllKeys(
 							errInfo = errInfo[:200]
 						}
 						channelLogStore.Record(channelIndex, &metrics.ChannelLog{
-							Timestamp:  time.Now(),
-							Model:      model,
+							Timestamp:     time.Now(),
+							Model:         redirectedModel,
+						OriginalModel: originalModel,
 							StatusCode: resp.StatusCode,
 							DurationMs: time.Since(attemptStart).Milliseconds(),
 							Success:    false,
@@ -237,9 +246,10 @@ func TryUpstreamWithAllKeys(
 						errInfo = errInfo[:200]
 					}
 					channelLogStore.Record(channelIndex, &metrics.ChannelLog{
-						Timestamp:  time.Now(),
-						Model:      model,
-						StatusCode: resp.StatusCode,
+						Timestamp:     time.Now(),
+						Model:         redirectedModel,
+						OriginalModel: originalModel,
+						StatusCode:    resp.StatusCode,
 						DurationMs: time.Since(attemptStart).Milliseconds(),
 						Success:    false,
 						KeyMask:    utils.MaskAPIKey(apiKey),
@@ -284,8 +294,9 @@ func TryUpstreamWithAllKeys(
 					// 记录渠道日志
 					if channelLogStore != nil {
 						channelLogStore.Record(channelIndex, &metrics.ChannelLog{
-							Timestamp:  time.Now(),
-							Model:      model,
+							Timestamp:     time.Now(),
+							Model:         redirectedModel,
+						OriginalModel: originalModel,
 							StatusCode: 200,
 							DurationMs: time.Since(attemptStart).Milliseconds(),
 							Success:    false,
@@ -309,8 +320,9 @@ func TryUpstreamWithAllKeys(
 							errInfo = errInfo[:200]
 						}
 						channelLogStore.Record(channelIndex, &metrics.ChannelLog{
-							Timestamp:  time.Now(),
-							Model:      model,
+							Timestamp:     time.Now(),
+							Model:         redirectedModel,
+						OriginalModel: originalModel,
 							StatusCode: 200,
 							DurationMs: time.Since(attemptStart).Milliseconds(),
 							Success:    false,
@@ -330,8 +342,9 @@ func TryUpstreamWithAllKeys(
 			// 记录渠道日志
 			if channelLogStore != nil {
 				channelLogStore.Record(channelIndex, &metrics.ChannelLog{
-					Timestamp:  time.Now(),
-					Model:      model,
+					Timestamp:     time.Now(),
+					Model:         redirectedModel,
+						OriginalModel: originalModel,
 					StatusCode: 200,
 					DurationMs: time.Since(attemptStart).Milliseconds(),
 					Success:    true,

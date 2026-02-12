@@ -36,6 +36,7 @@
               </template>
               <v-list-item-title class="d-flex align-center ga-2 text-body-2 flex-wrap">
                 <span class="text-medium-emphasis text-caption">{{ formatTime(log.timestamp) }}</span>
+                <span v-if="log.originalModel" class="text-caption text-medium-emphasis">{{ log.originalModel }} →</span>
                 <span class="font-weight-medium">{{ log.model }}</span>
                 <span class="text-caption text-medium-emphasis">{{ log.durationMs }}ms</span>
                 <span class="text-caption text-medium-emphasis">{{ log.keyMask }}</span>

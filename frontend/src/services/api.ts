@@ -234,6 +234,7 @@ export interface ModelStatsHistoryResponse {
 export interface ChannelLogEntry {
   timestamp: string
   model: string
+  originalModel?: string
   statusCode: number
   durationMs: number
   success: boolean

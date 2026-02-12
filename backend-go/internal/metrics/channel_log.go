@@ -7,15 +7,16 @@ import (
 
 // ChannelLog 单次上游请求日志
 type ChannelLog struct {
-	Timestamp  time.Time `json:"timestamp"`
-	Model      string    `json:"model"`
-	StatusCode int       `json:"statusCode"`
-	DurationMs int64     `json:"durationMs"`
-	Success    bool      `json:"success"`
-	KeyMask    string    `json:"keyMask"`
-	BaseURL    string    `json:"baseUrl"`
-	ErrorInfo  string    `json:"errorInfo"`
-	IsRetry    bool      `json:"isRetry"`
+	Timestamp     time.Time `json:"timestamp"`
+	Model         string    `json:"model"`                   // 实际使用的模型（重定向后）
+	OriginalModel string    `json:"originalModel,omitempty"` // 原始请求模型（仅当重定向时有值）
+	StatusCode    int       `json:"statusCode"`
+	DurationMs    int64     `json:"durationMs"`
+	Success       bool      `json:"success"`
+	KeyMask       string    `json:"keyMask"`
+	BaseURL       string    `json:"baseUrl"`
+	ErrorInfo     string    `json:"errorInfo"`
+	IsRetry       bool      `json:"isRetry"`
 }
 
 const maxChannelLogs = 50
