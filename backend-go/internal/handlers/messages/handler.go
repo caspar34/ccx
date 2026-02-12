@@ -296,8 +296,13 @@ func handleNormalResponse(
 
 	claudeResp, err := provider.ConvertToClaudeResponse(providerResp)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to convert response"})
-		return nil, err
+		// JSON 解析失败（如上游返回 HTML 错误页面）：不写 Header，返回可 failover 的错误
+		preview := bodyBytes
+		if len(preview) > 100 {
+			preview = preview[:100]
+		}
+		log.Printf("[Messages-InvalidBody] 响应体解析失败: %v, body前100字节: %s", err, preview)
+		return nil, fmt.Errorf("%w: %v", common.ErrInvalidResponseBody, err)
 	}
 
 	// Token 补全逻辑

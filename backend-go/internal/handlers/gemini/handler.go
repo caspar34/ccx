@@ -492,34 +492,46 @@ func handleSuccess(
 	case "gemini":
 		// 直接解析 Gemini 响应
 		if err := json.Unmarshal(bodyBytes, &geminiResp); err != nil {
-			c.Data(resp.StatusCode, "application/json", bodyBytes)
-			return nil, nil
+			preview := bodyBytes
+			if len(preview) > 100 {
+				preview = preview[:100]
+			}
+			log.Printf("[Gemini-InvalidBody] 响应体解析失败: %v, body前100字节: %s", err, preview)
+			return nil, fmt.Errorf("%w: %v", common.ErrInvalidResponseBody, err)
 		}
 
 	case "claude":
 		// 转换 Claude 响应为 Gemini 格式
 		var claudeResp map[string]interface{}
 		if err := json.Unmarshal(bodyBytes, &claudeResp); err != nil {
-			c.Data(resp.StatusCode, "application/json", bodyBytes)
-			return nil, nil
+			preview := bodyBytes
+			if len(preview) > 100 {
+				preview = preview[:100]
+			}
+			log.Printf("[Gemini-InvalidBody] Claude响应体解析失败: %v, body前100字节: %s", err, preview)
+			return nil, fmt.Errorf("%w: %v", common.ErrInvalidResponseBody, err)
 		}
 		geminiResp, err = converters.ClaudeResponseToGemini(claudeResp)
 		if err != nil {
-			c.Data(resp.StatusCode, "application/json", bodyBytes)
-			return nil, nil
+			log.Printf("[Gemini-InvalidBody] Claude响应转换失败: %v", err)
+			return nil, fmt.Errorf("%w: %v", common.ErrInvalidResponseBody, err)
 		}
 
 	case "openai":
 		// 转换 OpenAI 响应为 Gemini 格式
 		var openaiResp map[string]interface{}
 		if err := json.Unmarshal(bodyBytes, &openaiResp); err != nil {
-			c.Data(resp.StatusCode, "application/json", bodyBytes)
-			return nil, nil
+			preview := bodyBytes
+			if len(preview) > 100 {
+				preview = preview[:100]
+			}
+			log.Printf("[Gemini-InvalidBody] OpenAI响应体解析失败: %v, body前100字节: %s", err, preview)
+			return nil, fmt.Errorf("%w: %v", common.ErrInvalidResponseBody, err)
 		}
 		geminiResp, err = converters.OpenAIResponseToGemini(openaiResp)
 		if err != nil {
-			c.Data(resp.StatusCode, "application/json", bodyBytes)
-			return nil, nil
+			log.Printf("[Gemini-InvalidBody] OpenAI响应转换失败: %v", err)
+			return nil, fmt.Errorf("%w: %v", common.ErrInvalidResponseBody, err)
 		}
 
 	default:

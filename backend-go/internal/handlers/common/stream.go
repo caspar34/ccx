@@ -23,6 +23,10 @@ import (
 // 空响应定义：OutputTokens == 0 或 OutputTokens == 1 且内容仅为 "{"
 var ErrEmptyStreamResponse = errors.New("upstream returned empty stream response")
 
+// ErrInvalidResponseBody 上游返回 HTTP 200 但响应体不是合法 JSON（如返回 HTML 错误页面）
+// Header 未发送，可安全 failover 到下一个 Key/BaseURL/渠道
+var ErrInvalidResponseBody = errors.New("upstream returned invalid response body")
+
 // StreamPreflightResult 流式预检测结果
 type StreamPreflightResult struct {
 	BufferedEvents []string // 缓冲的事件（需要回放）

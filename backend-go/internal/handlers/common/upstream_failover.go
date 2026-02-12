@@ -282,8 +282,8 @@ func TryUpstreamWithAllKeys(
 					metricsManager.RecordRequestFinalizeClientCancel(currentBaseURL, apiKey, requestID)
 					channelScheduler.RecordRequestEnd(currentBaseURL, apiKey, kind)
 					log.Printf("[%s-Cancel] 请求已取消，停止渠道 failover", apiType)
-				} else if errors.Is(err, ErrEmptyStreamResponse) {
-					// 空响应：Header 未发送，可安全 failover 到下一个 Key/BaseURL/渠道
+				} else if errors.Is(err, ErrEmptyStreamResponse) || errors.Is(err, ErrInvalidResponseBody) {
+					// 空响应或无效响应体（如 HTML）：Header 未发送，可安全 failover
 					failedKeys[apiKey] = true
 					cfgManager.MarkKeyAsFailed(apiKey, apiType)
 					metricsManager.RecordRequestFinalizeFailure(currentBaseURL, apiKey, requestID)
@@ -293,6 +293,10 @@ func TryUpstreamWithAllKeys(
 					}
 					// 记录渠道日志
 					if channelLogStore != nil {
+						errInfo := err.Error()
+						if len(errInfo) > 200 {
+							errInfo = errInfo[:200]
+						}
 						channelLogStore.Record(channelIndex, &metrics.ChannelLog{
 							Timestamp:     time.Now(),
 							Model:         redirectedModel,
@@ -302,11 +306,11 @@ func TryUpstreamWithAllKeys(
 							Success:       false,
 							KeyMask:       utils.MaskAPIKey(apiKey),
 							BaseURL:       currentBaseURL,
-							ErrorInfo:     "empty stream response",
+							ErrorInfo:     errInfo,
 							IsRetry:       attempt > 0 || urlIdx > 0,
 						})
 					}
-					log.Printf("[%s-EmptyResponse] 上游返回空响应 (Key: %s)，尝试下一个密钥", apiType, utils.MaskAPIKey(apiKey))
+					log.Printf("[%s-InvalidResponse] 上游返回无效响应 (Key: %s): %v，尝试下一个密钥", apiType, utils.MaskAPIKey(apiKey), err)
 					continue
 				} else {
 					// 真实渠道故障：计入失败指标
