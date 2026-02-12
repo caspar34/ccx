@@ -92,6 +92,7 @@ func (p *OpenAIProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 	// 保留客户端的大部分 headers，只移除/替换必要的认证和代理相关 headers
 	req.Header = utils.PrepareUpstreamHeaders(c, req.URL.Host)
 	utils.SetAuthenticationHeader(req.Header, apiKey)
+	utils.ApplyCustomHeaders(req.Header, upstream.CustomHeaders)
 
 	return req, originalBodyBytes, nil
 }

@@ -113,6 +113,9 @@ func (p *ResponsesProvider) ConvertToProviderRequest(
 	// 确保 Content-Type 正确
 	req.Header.Set("Content-Type", "application/json")
 
+	// 应用自定义请求头（最后执行，允许覆盖任何头）
+	utils.ApplyCustomHeaders(req.Header, upstream.CustomHeaders)
+
 	return req, bodyBytes, nil
 }
 

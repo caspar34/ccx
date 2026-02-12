@@ -183,6 +183,9 @@ func (cm *ConfigManager) UpdateResponsesUpstream(index int, updates UpstreamUpda
 	if updates.LowQuality != nil {
 		upstream.LowQuality = *updates.LowQuality
 	}
+	if updates.CustomHeaders != nil {
+		upstream.CustomHeaders = updates.CustomHeaders
+	}
 
 	if err := cm.saveConfigLocked(cm.config); err != nil {
 		return false, err

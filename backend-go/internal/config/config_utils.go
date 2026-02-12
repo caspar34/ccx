@@ -151,6 +151,12 @@ func (u *UpstreamConfig) Clone() *UpstreamConfig {
 			cloned.ModelMapping[k] = v
 		}
 	}
+	if u.CustomHeaders != nil {
+		cloned.CustomHeaders = make(map[string]string, len(u.CustomHeaders))
+		for k, v := range u.CustomHeaders {
+			cloned.CustomHeaders[k] = v
+		}
+	}
 	if u.PromotionUntil != nil {
 		t := *u.PromotionUntil
 		cloned.PromotionUntil = &t

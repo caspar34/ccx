@@ -550,6 +550,76 @@
                 <v-switch v-model="form.stripThoughtSignature" inset color="error" hide-details />
               </div>
             </v-col>
+
+            <!-- 自定义请求头 -->
+            <v-col cols="12">
+              <v-card variant="outlined">
+                <v-card-title class="text-body-1 d-flex align-center ga-2">
+                  <v-icon size="small">mdi-web</v-icon>
+                  自定义请求头 (可选)
+                </v-card-title>
+                <v-card-text>
+                  <div class="text-caption text-medium-emphasis mb-3">
+                    添加或覆盖发送到上游的 HTTP 请求头
+                  </div>
+
+                  <!-- 已添加的请求头列表 -->
+                  <v-list v-if="Object.keys(form.customHeaders).length > 0" density="compact" class="mb-3">
+                    <v-list-item
+                      v-for="(value, key) in form.customHeaders"
+                      :key="key"
+                      class="px-2"
+                    >
+                      <template #prepend>
+                        <v-icon size="small" color="primary">mdi-tag</v-icon>
+                      </template>
+                      <v-list-item-title class="text-body-2">
+                        <code>{{ key }}</code>: <span class="text-medium-emphasis">{{ value }}</span>
+                      </v-list-item-title>
+                      <template #append>
+                        <v-btn
+                          icon="mdi-delete"
+                          size="x-small"
+                          variant="text"
+                          color="error"
+                          @click="removeCustomHeader(key as string)"
+                        />
+                      </template>
+                    </v-list-item>
+                  </v-list>
+
+                  <!-- 添加新请求头 -->
+                  <div class="d-flex ga-2 align-center">
+                    <v-text-field
+                      v-model="newHeaderKey"
+                      label="Header 名称"
+                      placeholder="X-Custom-Header"
+                      variant="outlined"
+                      density="compact"
+                      hide-details
+                      style="flex: 1"
+                    />
+                    <v-text-field
+                      v-model="newHeaderValue"
+                      label="Header 值"
+                      placeholder="value"
+                      variant="outlined"
+                      density="compact"
+                      hide-details
+                      style="flex: 2"
+                    />
+                    <v-btn
+                      icon="mdi-plus"
+                      size="small"
+                      color="primary"
+                      variant="tonal"
+                      :disabled="!newHeaderKey.trim() || !newHeaderValue.trim()"
+                      @click="addCustomHeader"
+                    />
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
           </v-row>
         </v-form>
       </v-card-text>
@@ -1022,7 +1092,8 @@ const form = reactive({
   stripThoughtSignature: false,
   description: '',
   apiKeys: [] as string[],
-  modelMapping: {} as Record<string, string>
+  modelMapping: {} as Record<string, string>,
+  customHeaders: {} as Record<string, string>
 })
 
 // 多 BaseURL 文本输入（独立变量，保留用户输入的换行）
@@ -1070,6 +1141,26 @@ const newMapping = reactive({
   source: '',
   target: ''
 })
+
+// 自定义请求头输入
+const newHeaderKey = ref('')
+const newHeaderValue = ref('')
+
+// 添加自定义请求头
+const addCustomHeader = () => {
+  const key = newHeaderKey.value.trim()
+  const value = newHeaderValue.value.trim()
+  if (key && value) {
+    form.customHeaders[key] = value
+    newHeaderKey.value = ''
+    newHeaderValue.value = ''
+  }
+}
+
+// 删除自定义请求头
+const removeCustomHeader = (key: string) => {
+  delete form.customHeaders[key]
+}
 
 // 安全地获取字符串值（处理 v-select/v-combobox 可能返回对象的情况）
 const getStringValue = (val: string | { title: string; value: string } | null | undefined): string => {
@@ -1205,9 +1296,12 @@ const resetForm = () => {
   form.description = ''
   form.apiKeys = []
   form.modelMapping = {}
+  form.customHeaders = {}
   newApiKey.value = ''
   newMapping.source = ''
   newMapping.target = ''
+  newHeaderKey.value = ''
+  newHeaderValue.value = ''
 
   // 重置 baseUrlsText
   baseUrlsText.value = ''
@@ -1265,6 +1359,7 @@ const loadChannelData = (channel: Channel) => {
   originalKeyMap.value.clear()
 
   form.modelMapping = { ...(channel.modelMapping || {}) }
+  form.customHeaders = { ...(channel.customHeaders || {}) }
 
   // 立即同步 baseUrl 到预览变量，避免等待 debounce
   formBaseUrlPreview.value = channel.baseUrl
@@ -1538,7 +1633,8 @@ const handleSubmit = async () => {
     stripThoughtSignature: form.stripThoughtSignature,
     description: form.description.trim(),
     apiKeys: processedApiKeys,
-    modelMapping: form.modelMapping
+    modelMapping: form.modelMapping,
+    customHeaders: form.customHeaders  // 始终传递，空对象表示清除
   }
 
   // 多 BaseURL 支持

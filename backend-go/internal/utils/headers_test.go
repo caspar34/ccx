@@ -217,3 +217,61 @@ func TestEnsureCompatibleUserAgent(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyCustomHeaders(t *testing.T) {
+	tests := []struct {
+		name        string
+		initial     map[string]string
+		custom      map[string]string
+		wantHeaders map[string]string
+	}{
+		{
+			name:    "添加新头部",
+			initial: map[string]string{"Content-Type": "application/json"},
+			custom:  map[string]string{"X-Custom": "value"},
+			wantHeaders: map[string]string{
+				"Content-Type": "application/json",
+				"X-Custom":     "value",
+			},
+		},
+		{
+			name:    "覆盖已有头部",
+			initial: map[string]string{"Authorization": "Bearer old"},
+			custom:  map[string]string{"Authorization": "Bearer new"},
+			wantHeaders: map[string]string{
+				"Authorization": "Bearer new",
+			},
+		},
+		{
+			name:    "跳过空白key或value",
+			initial: map[string]string{},
+			custom:  map[string]string{"": "value", "Key": "", "  ": "x", "Valid": "ok"},
+			wantHeaders: map[string]string{
+				"Valid": "ok",
+			},
+		},
+		{
+			name:        "空customHeaders",
+			initial:     map[string]string{"Keep": "this"},
+			custom:      nil,
+			wantHeaders: map[string]string{"Keep": "this"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers := http.Header{}
+			for k, v := range tt.initial {
+				headers.Set(k, v)
+			}
+
+			ApplyCustomHeaders(headers, tt.custom)
+
+			for k, want := range tt.wantHeaders {
+				if got := headers.Get(k); got != want {
+					t.Errorf("Header %s = %v, want %v", k, got, want)
+				}
+			}
+		})
+	}
+}

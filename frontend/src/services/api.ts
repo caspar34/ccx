@@ -91,6 +91,7 @@ export interface Channel {
   website?: string
   insecureSkipVerify?: boolean
   modelMapping?: Record<string, string>
+  customHeaders?: Record<string, string>  // 自定义请求头
   latency?: number
   status?: ChannelStatus | 'healthy' | 'error' | 'unknown' | ''
   index: number

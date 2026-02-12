@@ -186,6 +186,9 @@ func (cm *ConfigManager) UpdateUpstream(index int, updates UpstreamUpdate) (shou
 	if updates.InjectDummyThoughtSignature != nil {
 		upstream.InjectDummyThoughtSignature = *updates.InjectDummyThoughtSignature
 	}
+	if updates.CustomHeaders != nil {
+		upstream.CustomHeaders = updates.CustomHeaders
+	}
 
 	if err := cm.saveConfigLocked(cm.config); err != nil {
 		return false, err

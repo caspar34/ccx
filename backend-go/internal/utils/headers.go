@@ -67,6 +67,20 @@ func SetGeminiAuthenticationHeader(headers http.Header, apiKey string) {
 	headers.Set("x-goog-api-key", apiKey)
 }
 
+// ApplyCustomHeaders 应用自定义请求头（覆盖或添加）
+// 使用 http.Header.Set 会自动规范化 key 为 CanonicalHeaderKey 格式
+// 跳过空白 key 或 value
+func ApplyCustomHeaders(headers http.Header, customHeaders map[string]string) {
+	for key, value := range customHeaders {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		headers.Set(key, value)
+	}
+}
+
 // EnsureCompatibleUserAgent 确保兼容的User-Agent（仅在必要时设置）
 func EnsureCompatibleUserAgent(headers http.Header, serviceType string) {
 	userAgent := headers.Get("User-Agent")

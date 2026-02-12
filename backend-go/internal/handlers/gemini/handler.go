@@ -447,6 +447,9 @@ func buildProviderRequest(
 		utils.SetGeminiAuthenticationHeader(req.Header, apiKey)
 	}
 
+	// 应用自定义请求头
+	utils.ApplyCustomHeaders(req.Header, upstream.CustomHeaders)
+
 	return req, nil
 }
 

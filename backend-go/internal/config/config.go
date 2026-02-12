@@ -33,6 +33,8 @@ type UpstreamConfig struct {
 	// Gemini 特定配置
 	InjectDummyThoughtSignature bool `json:"injectDummyThoughtSignature,omitempty"` // 给空 thought_signature 注入 dummy 值（兼容 x666.me 等要求必须有该字段的 API）
 	StripThoughtSignature       bool `json:"stripThoughtSignature,omitempty"`       // 移除 thought_signature 字段（兼容旧版 Gemini API）
+	// 自定义请求头
+	CustomHeaders map[string]string `json:"customHeaders,omitempty"` // 自定义请求头（覆盖或添加到上游请求）
 }
 
 // UpstreamUpdate 用于部分更新 UpstreamConfig
@@ -54,6 +56,8 @@ type UpstreamUpdate struct {
 	// Gemini 特定配置
 	InjectDummyThoughtSignature *bool `json:"injectDummyThoughtSignature"`
 	StripThoughtSignature       *bool `json:"stripThoughtSignature"`
+	// 自定义请求头
+	CustomHeaders map[string]string `json:"customHeaders"`
 }
 
 // Config 配置结构

@@ -108,6 +108,7 @@ func (p *ClaudeProvider) ConvertToProviderRequest(c *gin.Context, upstream *conf
 	req.Header = utils.PrepareUpstreamHeaders(c, req.URL.Host)
 	utils.SetAuthenticationHeader(req.Header, apiKey)
 	utils.EnsureCompatibleUserAgent(req.Header, "claude")
+	utils.ApplyCustomHeaders(req.Header, upstream.CustomHeaders)
 
 	return req, bodyBytes, nil
 }

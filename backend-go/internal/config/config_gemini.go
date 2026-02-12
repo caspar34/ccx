@@ -189,6 +189,9 @@ func (cm *ConfigManager) UpdateGeminiUpstream(index int, updates UpstreamUpdate)
 	if updates.StripThoughtSignature != nil {
 		upstream.StripThoughtSignature = *updates.StripThoughtSignature
 	}
+	if updates.CustomHeaders != nil {
+		upstream.CustomHeaders = updates.CustomHeaders
+	}
 
 	if err := cm.saveConfigLocked(cm.config); err != nil {
 		return false, err
