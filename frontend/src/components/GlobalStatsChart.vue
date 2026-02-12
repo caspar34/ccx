@@ -188,14 +188,80 @@ const hasData = computed(() => {
 const chartColors = {
   traffic: {
     primary: '#3b82f6',    // Blue for requests
-    success: '#10b981',    // Green for success
-    failure: '#ef4444'     // Red for failure
   },
   tokens: {
     input: '#8b5cf6',      // Purple for input
     output: '#f97316'      // Orange for output
   }
 }
+
+// 失败率阈值：超过此值显示红色背景
+const FAILURE_RATE_THRESHOLD = 0.1 // 10%
+
+// 聚合间隔配置（与后端保持一致）
+const AGGREGATION_INTERVALS: Record<Duration, number> = {
+  '1h': 60000,    // 1 分钟
+  '6h': 300000,   // 5 分钟
+  '24h': 900000,  // 15 分钟
+  'today': 300000 // 5 分钟
+}
+
+const getAggregationInterval = (duration: Duration): number => {
+  return AGGREGATION_INTERVALS[duration] || 60000
+}
+
+// 计算每个时间点的失败率
+const timePointFailureRates = computed(() => {
+  if (!historyData.value?.dataPoints?.length) return []
+  return historyData.value.dataPoints
+    .filter(dp => dp.requestCount > 0)
+    .map(dp => ({
+      timestamp: new Date(dp.timestamp).getTime(),
+      failureRate: dp.requestCount > 0 ? dp.failureCount / dp.requestCount : 0
+    }))
+})
+
+// 根据失败率计算透明度
+const getFailureOpacity = (failureRate: number): number => {
+  const minOpacity = 0.08
+  const maxOpacity = 0.65
+  const normalizedRate = Math.min((failureRate - FAILURE_RATE_THRESHOLD) / (1 - FAILURE_RATE_THRESHOLD), 1)
+  return minOpacity + normalizedRate * (maxOpacity - minOpacity)
+}
+
+// 生成失败率背景色带 annotations
+const failureAnnotations = computed(() => {
+  if (selectedView.value !== 'traffic') return []
+  const rates = timePointFailureRates.value
+  if (rates.length === 0) return []
+
+  const interval = getAggregationInterval(selectedDuration.value)
+  const annotations: any[] = []
+
+  rates.forEach((point, index) => {
+    if (point.failureRate >= FAILURE_RATE_THRESHOLD) {
+      let pointInterval = interval
+      if (rates.length > 1) {
+        if (index > 0) {
+          pointInterval = point.timestamp - rates[index - 1].timestamp
+        } else if (index < rates.length - 1) {
+          pointInterval = rates[index + 1].timestamp - point.timestamp
+        }
+      }
+      pointInterval = Math.min(pointInterval, interval * 2)
+
+      annotations.push({
+        x: point.timestamp - pointInterval / 2,
+        x2: point.timestamp + pointInterval / 2,
+        fillColor: '#ef4444',
+        opacity: getFailureOpacity(point.failureRate),
+        label: { text: '' }
+      })
+    }
+  })
+
+  return annotations
+})
 
 // Format number for display
 const formatNumber = (num: number): string => {
@@ -225,7 +291,7 @@ const chartOptions = computed<ApexOptions>(() => {
       mode: isDark.value ? 'dark' : 'light'
     },
     colors: mode === 'traffic'
-      ? [chartColors.traffic.primary, chartColors.traffic.success]
+      ? [chartColors.traffic.primary]
       : [chartColors.tokens.input, chartColors.tokens.output],
     fill: {
       type: 'gradient' as const,
@@ -291,10 +357,14 @@ const chartOptions = computed<ApexOptions>(() => {
         formatter: (val: number) => mode === 'traffic'
           ? `${Math.round(val)} 请求`
           : formatNumber(val)
-      }
+      },
+      custom: mode === 'traffic' ? buildTrafficTooltip : undefined
+    },
+    annotations: {
+      xaxis: failureAnnotations.value
     },
     legend: {
-      show: true,
+      show: mode === 'tokens',
       position: 'top' as const,
       horizontalAlign: 'right' as const,
       fontSize: '11px',
@@ -302,6 +372,31 @@ const chartOptions = computed<ApexOptions>(() => {
     }
   }
 })
+
+// 构建流量模式的自定义 tooltip
+const buildTrafficTooltip = ({ dataPointIndex }: any): string => {
+  if (!historyData.value?.dataPoints) return ''
+  const dp = historyData.value.dataPoints[dataPointIndex]
+  if (!dp) return ''
+
+  const date = new Date(dp.timestamp)
+  const timeStr = date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  const failureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
+  const hasFailure = dp.failureCount > 0
+
+  let html = `<div style="padding: 8px 12px; font-size: 12px;">`
+  html += `<div style="font-weight: 600; margin-bottom: 6px; color: ${hasFailure ? '#ef4444' : 'inherit'};">${timeStr}</div>`
+  html += `<div style="display: flex; align-items: center; margin: 4px 0;">`
+  html += `<span style="width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></span>`
+  html += `<span style="flex: 1;">总请求</span>`
+  html += `<span style="margin-left: 12px; font-weight: 500;">${dp.requestCount}</span>`
+  html += `</div>`
+  if (hasFailure) {
+    html += `<div style="color: #ef4444; font-size: 11px; margin-top: 4px;">${dp.failureCount} 失败 (${failureRate}%)</div>`
+  }
+  html += `</div>`
+  return html
+}
 
 // Build chart series
 const chartSeries = computed(() => {
@@ -313,17 +408,10 @@ const chartSeries = computed(() => {
   if (mode === 'traffic') {
     return [
       {
-        name: '总请求',
+        name: '请求',
         data: dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.requestCount
-        }))
-      },
-      {
-        name: '成功',
-        data: dataPoints.map(dp => ({
-          x: new Date(dp.timestamp).getTime(),
-          y: dp.successCount
         }))
       }
     ]
