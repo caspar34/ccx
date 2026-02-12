@@ -4,6 +4,20 @@
 
 ---
 
+## [v2.6.13] - 2026-02-13
+
+### 新增
+
+- **全局流量图按模型堆叠面积曲线** - 流量模式改为按实际模型（如 claude-opus-4-6、claude-haiku-4-5）显示堆叠面积曲线，tooltip 显示各模型请求数/失败数，移除冗余的 ModelStatsChart 组件
+- **渠道流量图改为堆叠面积图** - Key+Model 分组方式不变，流量模式改为堆叠面积并显示 legend
+
+### 修复
+
+- **渠道 Token/Cache 图多模型时无数据** - 按模型拆分时 Token/Cache 字段未传递，补齐 KeyModelHistoryDataPoint 的 Token 数据
+- **渠道 Token/Cache 图多模型 Y 轴刻度不一致** - 所有 Input series 共享左侧 Y 轴，所有 Output series 共享右侧 Y 轴
+
+---
+
 ## [v2.6.12] - 2026-02-12
 
 ### 新增
