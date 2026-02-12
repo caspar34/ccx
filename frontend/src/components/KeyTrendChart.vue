@@ -314,36 +314,53 @@ const chartOptions = computed<ApexOptions>(() => {
   const mode = selectedView.value
 
   // Token/Cache 模式使用双 Y 轴（左侧 Input/Read，右侧 Output/Write）
-  // 解决数量级差异大（如 Input 几十K，Output 几百）导致小值不可见的问题
+  // 所有 Input series 共享左侧 Y 轴，所有 Output series 共享右侧 Y 轴
   let yaxisConfig: any
   if (mode === 'tokens' || mode === 'cache') {
     const keyCount = historyData.value?.keys?.length || 1
-    yaxisConfig = []
-    // 为每个 key 的 Input 和 Output 分别配置 Y 轴
-    for (let i = 0; i < keyCount; i++) {
-      // Input/Read - 左侧 Y 轴（只第一个显示标签）
-      yaxisConfig.push({
-        seriesName: historyData.value?.keys?.[i]?.keyMask
-          ? `${historyData.value.keys[i].keyMask} ${mode === 'tokens' ? 'Input' : 'Cache Read'}`
-          : undefined,
-        show: i === 0,
+    const inLabel = mode === 'tokens' ? 'Input' : 'Cache Read'
+    const outLabel = mode === 'tokens' ? 'Output' : 'Cache Write'
+
+    // 第一个 Key 的 series 名称作为 Y 轴锚点
+    const firstKey = historyData.value?.keys?.[0]
+    const firstDisplayName = firstKey?.model ? `${firstKey.keyMask}/${firstKey.model}` : firstKey?.keyMask
+    const anchorInName = firstDisplayName ? `${firstDisplayName} ${inLabel}` : undefined
+    const anchorOutName = firstDisplayName ? `${firstDisplayName} ${outLabel}` : undefined
+
+    yaxisConfig = [
+      // 左侧 Y 轴（Input/Read）
+      {
+        seriesName: anchorInName,
+        show: true,
         labels: {
           formatter: (val: number) => formatAxisValue(val, mode),
           style: { fontSize: '11px' }
         },
         min: 0
-      })
-      // Output/Write - 右侧 Y 轴（只第一个显示标签）
-      yaxisConfig.push({
-        seriesName: historyData.value?.keys?.[i]?.keyMask
-          ? `${historyData.value.keys[i].keyMask} ${mode === 'tokens' ? 'Output' : 'Cache Write'}`
-          : undefined,
+      },
+      // 右侧 Y 轴（Output/Write）
+      {
+        seriesName: anchorOutName,
         opposite: true,
-        show: i === 0,
+        show: true,
         labels: {
           formatter: (val: number) => formatAxisValue(val, mode),
           style: { fontSize: '11px' }
         },
+        min: 0
+      }
+    ]
+
+    // 后续 Key 的 series 绑定到同一对 Y 轴（seriesName 指向锚点）
+    for (let i = 1; i < keyCount; i++) {
+      yaxisConfig.push({
+        seriesName: anchorInName,
+        show: false,
+        min: 0
+      })
+      yaxisConfig.push({
+        seriesName: anchorOutName,
+        show: false,
         min: 0
       })
     }
