@@ -175,13 +175,13 @@ func TryUpstreamWithAllKeys(
 						Timestamp:     time.Now(),
 						Model:         redirectedModel,
 						OriginalModel: originalModel,
-						StatusCode: 0,
-						DurationMs: time.Since(attemptStart).Milliseconds(),
-						Success:    false,
-						KeyMask:    utils.MaskAPIKey(apiKey),
-						BaseURL:    currentBaseURL,
-						ErrorInfo:  errInfo,
-						IsRetry:    attempt > 0 || urlIdx > 0,
+						StatusCode:    0,
+						DurationMs:    time.Since(attemptStart).Milliseconds(),
+						Success:       false,
+						KeyMask:       utils.MaskAPIKey(apiKey),
+						BaseURL:       currentBaseURL,
+						ErrorInfo:     errInfo,
+						IsRetry:       attempt > 0 || urlIdx > 0,
 					})
 				}
 				log.Printf("[%s-Key] 警告: API密钥失败: %v", apiType, err)
@@ -219,14 +219,14 @@ func TryUpstreamWithAllKeys(
 						channelLogStore.Record(channelIndex, &metrics.ChannelLog{
 							Timestamp:     time.Now(),
 							Model:         redirectedModel,
-						OriginalModel: originalModel,
-							StatusCode: resp.StatusCode,
-							DurationMs: time.Since(attemptStart).Milliseconds(),
-							Success:    false,
-							KeyMask:    utils.MaskAPIKey(apiKey),
-							BaseURL:    currentBaseURL,
-							ErrorInfo:  errInfo,
-							IsRetry:    attempt > 0 || urlIdx > 0,
+							OriginalModel: originalModel,
+							StatusCode:    resp.StatusCode,
+							DurationMs:    time.Since(attemptStart).Milliseconds(),
+							Success:       false,
+							KeyMask:       utils.MaskAPIKey(apiKey),
+							BaseURL:       currentBaseURL,
+							ErrorInfo:     errInfo,
+							IsRetry:       attempt > 0 || urlIdx > 0,
 						})
 					}
 
@@ -250,12 +250,12 @@ func TryUpstreamWithAllKeys(
 						Model:         redirectedModel,
 						OriginalModel: originalModel,
 						StatusCode:    resp.StatusCode,
-						DurationMs: time.Since(attemptStart).Milliseconds(),
-						Success:    false,
-						KeyMask:    utils.MaskAPIKey(apiKey),
-						BaseURL:    currentBaseURL,
-						ErrorInfo:  errInfo,
-						IsRetry:    attempt > 0 || urlIdx > 0,
+						DurationMs:    time.Since(attemptStart).Milliseconds(),
+						Success:       false,
+						KeyMask:       utils.MaskAPIKey(apiKey),
+						BaseURL:       currentBaseURL,
+						ErrorInfo:     errInfo,
+						IsRetry:       attempt > 0 || urlIdx > 0,
 					})
 				}
 				c.Data(resp.StatusCode, "application/json", respBodyBytes)
@@ -296,14 +296,14 @@ func TryUpstreamWithAllKeys(
 						channelLogStore.Record(channelIndex, &metrics.ChannelLog{
 							Timestamp:     time.Now(),
 							Model:         redirectedModel,
-						OriginalModel: originalModel,
-							StatusCode: 200,
-							DurationMs: time.Since(attemptStart).Milliseconds(),
-							Success:    false,
-							KeyMask:    utils.MaskAPIKey(apiKey),
-							BaseURL:    currentBaseURL,
-							ErrorInfo:  "empty stream response",
-							IsRetry:    attempt > 0 || urlIdx > 0,
+							OriginalModel: originalModel,
+							StatusCode:    200,
+							DurationMs:    time.Since(attemptStart).Milliseconds(),
+							Success:       false,
+							KeyMask:       utils.MaskAPIKey(apiKey),
+							BaseURL:       currentBaseURL,
+							ErrorInfo:     "empty stream response",
+							IsRetry:       attempt > 0 || urlIdx > 0,
 						})
 					}
 					log.Printf("[%s-EmptyResponse] 上游返回空响应 (Key: %s)，尝试下一个密钥", apiType, utils.MaskAPIKey(apiKey))
@@ -322,14 +322,14 @@ func TryUpstreamWithAllKeys(
 						channelLogStore.Record(channelIndex, &metrics.ChannelLog{
 							Timestamp:     time.Now(),
 							Model:         redirectedModel,
-						OriginalModel: originalModel,
-							StatusCode: 200,
-							DurationMs: time.Since(attemptStart).Milliseconds(),
-							Success:    false,
-							KeyMask:    utils.MaskAPIKey(apiKey),
-							BaseURL:    currentBaseURL,
-							ErrorInfo:  errInfo,
-							IsRetry:    attempt > 0 || urlIdx > 0,
+							OriginalModel: originalModel,
+							StatusCode:    200,
+							DurationMs:    time.Since(attemptStart).Milliseconds(),
+							Success:       false,
+							KeyMask:       utils.MaskAPIKey(apiKey),
+							BaseURL:       currentBaseURL,
+							ErrorInfo:     errInfo,
+							IsRetry:       attempt > 0 || urlIdx > 0,
 						})
 					}
 					log.Printf("[%s-Key] 警告: 响应处理失败: %v", apiType, err)
@@ -344,13 +344,13 @@ func TryUpstreamWithAllKeys(
 				channelLogStore.Record(channelIndex, &metrics.ChannelLog{
 					Timestamp:     time.Now(),
 					Model:         redirectedModel,
-						OriginalModel: originalModel,
-					StatusCode: 200,
-					DurationMs: time.Since(attemptStart).Milliseconds(),
-					Success:    true,
-					KeyMask:    utils.MaskAPIKey(apiKey),
-					BaseURL:    currentBaseURL,
-					IsRetry:    attempt > 0 || urlIdx > 0,
+					OriginalModel: originalModel,
+					StatusCode:    200,
+					DurationMs:    time.Since(attemptStart).Milliseconds(),
+					Success:       true,
+					KeyMask:       utils.MaskAPIKey(apiKey),
+					BaseURL:       currentBaseURL,
+					IsRetry:       attempt > 0 || urlIdx > 0,
 				})
 			}
 			return true, apiKey, originalIdx, nil, usage, nil
