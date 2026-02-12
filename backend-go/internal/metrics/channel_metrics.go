@@ -2303,6 +2303,83 @@ func (m *MetricsManager) GetKeyHistoricalStatsMultiURL(baseURLs []string, apiKey
 	return result
 }
 
+// KeyModelHistoryDataPoint Key+Model 组合的历史数据点
+type KeyModelHistoryDataPoint struct {
+	Timestamp    time.Time `json:"timestamp"`
+	RequestCount int64     `json:"requestCount"`
+	SuccessCount int64     `json:"successCount"`
+	FailureCount int64     `json:"failureCount"`
+}
+
+// GetKeyModelHistoricalStatsMultiURL 获取单个 Key 按模型分组的历史数据
+func (m *MetricsManager) GetKeyModelHistoricalStatsMultiURL(baseURLs []string, apiKey string, duration, interval time.Duration) map[string][]KeyModelHistoryDataPoint {
+	if interval <= 0 || duration <= 0 || len(baseURLs) == 0 {
+		return nil
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	now := time.Now()
+	startTime := now.Add(-duration).Truncate(interval)
+	endTime := now.Truncate(interval).Add(interval)
+	numPoints := int(duration/interval) + 1
+
+	// 按模型分组的桶: model -> bucketIndex -> data
+	modelBuckets := make(map[string]map[int64]*keyBucketData)
+
+	for _, baseURL := range baseURLs {
+		metricsKey := generateMetricsKey(baseURL, apiKey)
+		metrics, exists := m.keyMetrics[metricsKey]
+		if !exists {
+			continue
+		}
+
+		for _, record := range metrics.requestHistory {
+			if record.Timestamp.After(startTime) && record.Timestamp.Before(endTime) {
+				offset := int64(record.Timestamp.Sub(startTime) / interval)
+				if offset >= 0 && offset < int64(numPoints) {
+					model := record.Model
+					if model == "" {
+						model = "unknown"
+					}
+					if modelBuckets[model] == nil {
+						modelBuckets[model] = make(map[int64]*keyBucketData)
+						for i := 0; i < numPoints; i++ {
+							modelBuckets[model][int64(i)] = &keyBucketData{}
+						}
+					}
+					b := modelBuckets[model][offset]
+					b.requestCount++
+					if record.Success {
+						b.successCount++
+					} else {
+						b.failureCount++
+					}
+				}
+			}
+		}
+	}
+
+	// 构建结果
+	result := make(map[string][]KeyModelHistoryDataPoint)
+	for model, buckets := range modelBuckets {
+		points := make([]KeyModelHistoryDataPoint, numPoints)
+		for i := 0; i < numPoints; i++ {
+			b := buckets[int64(i)]
+			points[i] = KeyModelHistoryDataPoint{
+				Timestamp:    startTime.Add(time.Duration(i+1) * interval),
+				RequestCount: b.requestCount,
+				SuccessCount: b.successCount,
+				FailureCount: b.failureCount,
+			}
+		}
+		result[model] = points
+	}
+
+	return result
+}
+
 // keyBucketData Key 级别时间分桶的辅助结构（包含 Token 数据）
 type keyBucketData struct {
 	requestCount        int64

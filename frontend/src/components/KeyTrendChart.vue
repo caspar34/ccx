@@ -433,13 +433,14 @@ const buildChartSeries = (data: ChannelKeyMetricsHistoryResponse | null) => {
   const mode = selectedView.value
   const result: { name: string; data: { x: number; y: number }[] }[] = []
 
-  data.keys.forEach((keyData, keyIndex) => {
-    const _color = keyColors[keyIndex % keyColors.length]
+  data.keys.forEach((keyData, _keyIndex) => {
+    // 显示名称：有模型时显示 "keyMask/model"，否则只显示 keyMask
+    const displayName = keyData.model ? `${keyData.keyMask}/${keyData.model}` : keyData.keyMask
 
     if (mode === 'traffic') {
       // 单向模式：只显示请求数
       result.push({
-        name: keyData.keyMask,
+        name: displayName,
         data: keyData.dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.requestCount
@@ -452,7 +453,7 @@ const buildChartSeries = (data: ChannelKeyMetricsHistoryResponse | null) => {
 
       // 正向（Input/Read）
       result.push({
-        name: `${keyData.keyMask} ${inLabel}`,
+        name: `${displayName} ${inLabel}`,
         data: keyData.dataPoints.map(dp => {
           let value = 0
           if (mode === 'tokens') {
@@ -466,7 +467,7 @@ const buildChartSeries = (data: ChannelKeyMetricsHistoryResponse | null) => {
 
       // Output/Write - 使用虚线区分
       result.push({
-        name: `${keyData.keyMask} ${outLabel}`,
+        name: `${displayName} ${outLabel}`,
         data: keyData.dataPoints.map(dp => {
           let value = 0
           if (mode === 'tokens') {
@@ -570,8 +571,10 @@ const buildTrafficTooltip = ({ seriesIndex, dataPointIndex, w }: any): string =>
       )
 
       if (aggregated.total > 0) {
+        // 显示名称：有模型时显示 "keyMask/model"
+        const displayName = keyData.model ? `${keyData.keyMask}/${keyData.model}` : keyData.keyMask
         keyStats.push({
-          keyMask: escapeHtml(keyData.keyMask),
+          keyMask: escapeHtml(displayName),
           success: aggregated.success,
           failure: aggregated.failure,
           total: aggregated.total,

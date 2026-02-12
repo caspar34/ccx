@@ -168,6 +168,7 @@ export interface KeyHistoryDataPoint {
 // 单个 Key 的历史数据
 export interface KeyHistoryData {
   keyMask: string
+  model?: string  // 模型名（可选，用于 Key+Model 组合显示）
   color: string
   dataPoints: KeyHistoryDataPoint[]
 }

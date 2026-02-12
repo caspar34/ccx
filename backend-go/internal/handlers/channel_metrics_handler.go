@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -387,9 +388,10 @@ type ChannelKeyMetricsHistoryResponse struct {
 	Keys         []KeyMetricsHistoryResult `json:"keys"`
 }
 
-// KeyMetricsHistoryResult 单个 Key 的历史数据
+// KeyMetricsHistoryResult 单个 Key+Model 组合的历史数据
 type KeyMetricsHistoryResult struct {
 	KeyMask    string                        `json:"keyMask"`
+	Model      string                        `json:"model,omitempty"` // 模型名（空表示聚合所有模型）
 	Color      string                        `json:"color"`
 	DataPoints []metrics.KeyHistoryDataPoint `json:"dataPoints"`
 }
@@ -496,25 +498,58 @@ func GetChannelKeyMetricsHistory(metricsManager *metrics.MetricsManager, cfgMana
 		result := ChannelKeyMetricsHistoryResponse{
 			ChannelIndex: channelID,
 			ChannelName:  upstream.Name,
-			Keys:         make([]KeyMetricsHistoryResult, 0, len(displayKeys)),
+			Keys:         make([]KeyMetricsHistoryResult, 0),
 		}
 
 		// 为筛选后的 Key 获取历史数据
-		for i, keyInfo := range displayKeys {
-			// 使用多 URL 聚合方法获取单个 Key 的历史数据（支持 failover 多端点场景）
-			dataPoints := metricsManager.GetKeyHistoricalStatsMultiURL(upstream.GetAllBaseURLs(), keyInfo.APIKey, duration, interval)
-
-			// 获取 Key 的颜色
-			color := keyColors[i%len(keyColors)]
-
-			// 获取 Key 的脱敏显示（只取前 8 个字符）
+		// 同时返回按 Key 聚合的完整数据（含 token）和按模型拆分的流量数据
+		colorIndex := 0
+		for _, keyInfo := range displayKeys {
 			keyMask := truncateKeyMask(keyInfo.KeyMask, 8)
+			// 获取完整的 Key 级别数据（含 token/cache，用于 tokens/cache 视图）
+			fullDataPoints := metricsManager.GetKeyHistoricalStatsMultiURL(upstream.GetAllBaseURLs(), keyInfo.APIKey, duration, interval)
 
-			result.Keys = append(result.Keys, KeyMetricsHistoryResult{
-				KeyMask:    keyMask,
-				Color:      color,
-				DataPoints: dataPoints,
-			})
+			// 获取按模型拆分的流量数据
+			modelData := metricsManager.GetKeyModelHistoricalStatsMultiURL(upstream.GetAllBaseURLs(), keyInfo.APIKey, duration, interval)
+
+			if len(modelData) <= 1 {
+				// 只有一个或没有模型时，直接返回聚合数据
+				result.Keys = append(result.Keys, KeyMetricsHistoryResult{
+					KeyMask:    keyMask,
+					Color:      keyColors[colorIndex%len(keyColors)],
+					DataPoints: fullDataPoints,
+				})
+				colorIndex++
+			} else {
+				// 多个模型时，按模型拆分返回（仅流量数据，token 数据从聚合数据获取）
+				// 对模型名排序以保证颜色稳定
+				models := make([]string, 0, len(modelData))
+				for model := range modelData {
+					models = append(models, model)
+				}
+				sort.Strings(models)
+
+				for _, model := range models {
+					points := modelData[model]
+					dataPoints := make([]metrics.KeyHistoryDataPoint, len(points))
+					for i, p := range points {
+						dataPoints[i] = metrics.KeyHistoryDataPoint{
+							Timestamp:    p.Timestamp,
+							RequestCount: p.RequestCount,
+							SuccessCount: p.SuccessCount,
+							FailureCount: p.FailureCount,
+							// token/cache 数据在按模型拆分时不可用，前端 tokens/cache 视图应使用聚合数据
+						}
+					}
+					result.Keys = append(result.Keys, KeyMetricsHistoryResult{
+						KeyMask:    keyMask,
+						Model:      model,
+						Color:      keyColors[colorIndex%len(keyColors)],
+						DataPoints: dataPoints,
+					})
+					colorIndex++
+				}
+			}
 		}
 
 		c.JSON(200, result)
