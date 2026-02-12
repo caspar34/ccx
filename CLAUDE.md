@@ -101,13 +101,6 @@ ccx/
 3. **调整调度策略**: 修改 `internal/scheduler/channel_scheduler.go`
 4. **前端界面调整**: 编辑 `frontend/src/components/` 中的 Vue 组件
 
-## 重要提示
-
-- **Git 操作**: 未经用户明确要求，不要执行 git commit/push/branch 操作
-- **配置热重载**: `backend-go/.config/config.json` 修改后自动生效，无需重启
-- **环境变量变更**: 修改 `.env` 后需要重启服务
-- **认证**: 所有端点（除 `/health`）需要 `x-api-key` 头或 `PROXY_ACCESS_KEY`
-
 ## Git 命令注意事项
 
 - 执行 `git add`/`git commit` 前确保在项目根目录
@@ -121,3 +114,10 @@ ccx/
 - [frontend/CLAUDE.md](frontend/CLAUDE.md) - Vue 前端详细文档
 - [ARCHITECTURE.md](ARCHITECTURE.md) - 详细架构设计
 - [ENVIRONMENT.md](ENVIRONMENT.md) - 完整环境变量配置
+
+## 重要提示
+
+- **环境变量变更**: 修改 `.env` 后需要重启服务
+- **认证**: 所有端点（除 `/health`）需要 `x-api-key` 头或 `PROXY_ACCESS_KEY`
+- **配置热重载**: `.config/config.json` 修改后自动生效
+- **开发服务**: 默认假设用户已通过 `make dev` 或 `make frontend-dev` 启动开发服务，禁止自动杀进程重启
