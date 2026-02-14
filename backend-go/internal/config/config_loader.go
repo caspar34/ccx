@@ -104,6 +104,7 @@ func (cm *ConfigManager) createDefaultConfig() error {
 		GeminiUpstream:           []UpstreamConfig{},
 		GeminiLoadBalance:        "failover",
 		FuzzyModeEnabled:         true, // 默认启用 Fuzzy 模式
+		StripBillingHeader:       true, // 默认启用移除计费头
 	}
 
 	if err := os.MkdirAll(filepath.Dir(cm.configFile), 0755); err != nil {
@@ -139,6 +140,12 @@ func (cm *ConfigManager) applyConfigDefaults(rawJSON []byte) bool {
 			cm.config.FuzzyModeEnabled = true
 			needSave = true
 			log.Printf("[Config-Migration] FuzzyModeEnabled 字段不存在，设为默认值 true")
+		}
+		if _, exists := rawMap["stripBillingHeader"]; !exists {
+			// 字段不存在，设为默认值 true
+			cm.config.StripBillingHeader = true
+			needSave = true
+			log.Printf("[Config-Migration] StripBillingHeader 字段不存在，设为默认值 true")
 		}
 	}
 

@@ -42,6 +42,11 @@ func Handler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, channel
 		bodyBytes, modified := common.RemoveEmptySignatures(bodyBytes, envCfg.EnableRequestLogs, "Messages")
 		_ = modified // 保留以便未来扩展（如需在 handler 层面做额外处理）
 
+		// 预处理：移除 system 中的 cch= 计费参数
+		if cfgManager.GetStripBillingHeader() {
+			bodyBytes, _ = common.RemoveBillingHeaders(bodyBytes, envCfg.EnableRequestLogs, "Messages")
+		}
+
 		// 解析请求
 		var claudeReq types.ClaudeRequest
 		if len(bodyBytes) > 0 {

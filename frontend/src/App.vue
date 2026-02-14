@@ -251,6 +251,28 @@
           </div>
 
           <div class="action-bar-right">
+            <!-- CCH 计费头移除切换按钮 -->
+            <v-tooltip location="bottom" content-class="fuzzy-tooltip">
+              <template #activator="{ props }">
+                <v-btn
+                  v-bind="props"
+                  variant="tonal"
+                  size="large"
+                  :loading="systemStore.stripBillingHeaderLoading"
+                  :disabled="systemStore.stripBillingHeaderLoadError"
+                  :color="systemStore.stripBillingHeaderLoadError ? 'error' : (preferencesStore.stripBillingHeader ? 'info' : 'default')"
+                  class="action-btn"
+                  @click="toggleStripBillingHeader"
+                >
+                  <v-icon start size="20">
+                    {{ systemStore.stripBillingHeaderLoadError ? 'mdi-alert-circle-outline' : (preferencesStore.stripBillingHeader ? 'mdi-tag-off' : 'mdi-tag') }}
+                  </v-icon>
+                  CCH
+                </v-btn>
+              </template>
+              <span>{{ systemStore.stripBillingHeaderLoadError ? '加载失败，请刷新页面' : (preferencesStore.stripBillingHeader ? '已启用：自动移除 system 中的 cch= 计费参数' : '已关闭：保留完整的计费头信息') }}</span>
+            </v-tooltip>
+
             <!-- Fuzzy 模式切换按钮 -->
             <v-tooltip location="bottom" content-class="fuzzy-tooltip">
               <template #activator="{ props }">
@@ -578,6 +600,36 @@ const toggleFuzzyMode = async () => {
   }
 }
 
+// 移除计费头管理
+const loadStripBillingHeaderStatus = async () => {
+  systemStore.setStripBillingHeaderLoadError(false)
+  try {
+    const { stripBillingHeader: enabled } = await api.getStripBillingHeader()
+    preferencesStore.setStripBillingHeader(enabled)
+  } catch (e) {
+    console.error('Failed to load strip billing header status:', e)
+    systemStore.setStripBillingHeaderLoadError(true)
+    showToast('加载移除计费头状态失败，请刷新页面重试', 'warning')
+  }
+}
+
+const toggleStripBillingHeader = async () => {
+  if (systemStore.stripBillingHeaderLoadError) {
+    showToast('移除计费头状态未知，请先刷新页面', 'warning')
+    return
+  }
+  systemStore.setStripBillingHeaderLoading(true)
+  try {
+    await api.setStripBillingHeader(!preferencesStore.stripBillingHeader)
+    preferencesStore.toggleStripBillingHeader()
+    showToast(`移除计费头已${preferencesStore.stripBillingHeader ? '启用' : '关闭'}`, 'success')
+  } catch (e) {
+    showToast(`切换移除计费头失败: ${e instanceof Error ? e.message : '未知错误'}`, 'error')
+  } finally {
+    systemStore.setStripBillingHeaderLoading(false)
+  }
+}
+
 // 主题管理
 const toggleDarkMode = () => {
   const newMode = preferencesStore.darkModePreference === 'dark' ? 'light' : 'dark'
@@ -822,6 +874,8 @@ onMounted(async () => {
     await refreshChannels()
     // 加载 Fuzzy 模式状态
     await loadFuzzyModeStatus()
+    // 加载移除计费头状态
+    await loadStripBillingHeaderStatus()
     // 启动自动刷新
     startAutoRefresh()
     // 初始化完成后根据最新刷新结果设置系统状态

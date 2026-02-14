@@ -215,6 +215,10 @@ func main() {
 		// Fuzzy 模式设置
 		apiGroup.GET("/settings/fuzzy-mode", handlers.GetFuzzyMode(cfgManager))
 		apiGroup.PUT("/settings/fuzzy-mode", handlers.SetFuzzyMode(cfgManager))
+
+		// 移除计费头设置
+		apiGroup.GET("/settings/strip-billing-header", handlers.GetStripBillingHeader(cfgManager))
+		apiGroup.PUT("/settings/strip-billing-header", handlers.SetStripBillingHeader(cfgManager))
 	}
 
 	// 代理端点 - Messages API

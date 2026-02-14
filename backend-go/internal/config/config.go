@@ -77,6 +77,9 @@ type Config struct {
 
 	// Fuzzy 模式：启用时模糊处理错误，所有非 2xx 错误都尝试 failover
 	FuzzyModeEnabled bool `json:"fuzzyModeEnabled"`
+
+	// 移除计费头中的 cch= 参数：启用时自动从 system 数组中移除 cch=xxx; 部分
+	StripBillingHeader bool `json:"stripBillingHeader"`
 }
 
 // FailedKey 失败密钥记录
@@ -309,5 +312,33 @@ func (cm *ConfigManager) SetFuzzyModeEnabled(enabled bool) error {
 		status = "启用"
 	}
 	log.Printf("[Config-FuzzyMode] Fuzzy 模式已%s", status)
+	return nil
+}
+
+// ============== StripBillingHeader 相关方法 ==============
+
+// GetStripBillingHeader 获取移除计费头状态
+func (cm *ConfigManager) GetStripBillingHeader() bool {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.config.StripBillingHeader
+}
+
+// SetStripBillingHeader 设置移除计费头状态
+func (cm *ConfigManager) SetStripBillingHeader(enabled bool) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.config.StripBillingHeader = enabled
+
+	if err := cm.saveConfigLocked(cm.config); err != nil {
+		return err
+	}
+
+	status := "关闭"
+	if enabled {
+		status = "启用"
+	}
+	log.Printf("[Config-StripBillingHeader] 移除计费头已%s", status)
 	return nil
 }

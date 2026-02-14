@@ -35,6 +35,10 @@ export const useSystemStore = defineStore('system', () => {
   const fuzzyModeLoading = ref(false)
   const fuzzyModeLoadError = ref(false)
 
+  // 移除计费头加载状态
+  const stripBillingHeaderLoading = ref(false)
+  const stripBillingHeaderLoadError = ref(false)
+
   // ===== 计算属性 =====
 
   const systemStatusText = computed(() => {
@@ -108,6 +112,20 @@ export const useSystemStore = defineStore('system', () => {
   }
 
   /**
+   * 设置移除计费头加载状态
+   */
+  function setStripBillingHeaderLoading(loading: boolean) {
+    stripBillingHeaderLoading.value = loading
+  }
+
+  /**
+   * 设置移除计费头加载错误状态
+   */
+  function setStripBillingHeaderLoadError(error: boolean) {
+    stripBillingHeaderLoadError.value = error
+  }
+
+  /**
    * 重置系统状态
    */
   function resetSystemState() {
@@ -124,6 +142,8 @@ export const useSystemStore = defineStore('system', () => {
     isCheckingVersion.value = false
     fuzzyModeLoading.value = false
     fuzzyModeLoadError.value = false
+    stripBillingHeaderLoading.value = false
+    stripBillingHeaderLoadError.value = false
   }
 
   return {
@@ -133,6 +153,8 @@ export const useSystemStore = defineStore('system', () => {
     isCheckingVersion,
     fuzzyModeLoading,
     fuzzyModeLoadError,
+    stripBillingHeaderLoading,
+    stripBillingHeaderLoadError,
 
     // 计算属性
     systemStatusText,
@@ -145,6 +167,8 @@ export const useSystemStore = defineStore('system', () => {
     setCheckingVersion,
     setFuzzyModeLoading,
     setFuzzyModeLoadError,
+    setStripBillingHeaderLoading,
+    setStripBillingHeaderLoadError,
     resetSystemState,
   }
 })

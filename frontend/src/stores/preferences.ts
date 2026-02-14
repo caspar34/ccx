@@ -19,6 +19,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
   // Fuzzy 模式开关
   const fuzzyModeEnabled = ref(true)
 
+  // 移除计费头开关
+  const stripBillingHeader = ref(true)
+
   // 全局统计面板展开状态
   const showGlobalStats = ref(false)
 
@@ -56,6 +59,20 @@ export const usePreferencesStore = defineStore('preferences', () => {
   }
 
   /**
+   * 设置移除计费头
+   */
+  function setStripBillingHeader(enabled: boolean) {
+    stripBillingHeader.value = enabled
+  }
+
+  /**
+   * 切换移除计费头
+   */
+  function toggleStripBillingHeader() {
+    stripBillingHeader.value = !stripBillingHeader.value
+  }
+
+  /**
    * 切换全局统计面板
    */
   function toggleGlobalStats() {
@@ -66,6 +83,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
     // 状态
     darkModePreference,
     fuzzyModeEnabled,
+    stripBillingHeader,
     showGlobalStats,
 
     // 方法
@@ -73,6 +91,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
     toggleDarkMode,
     setFuzzyMode,
     toggleFuzzyMode,
+    setStripBillingHeader,
+    toggleStripBillingHeader,
     toggleGlobalStats,
   }
 }, {

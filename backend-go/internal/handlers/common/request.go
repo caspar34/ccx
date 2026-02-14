@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
@@ -281,4 +283,61 @@ func ExtractConversationID(c *gin.Context, bodyBytes []byte) string {
 	}
 
 	return ""
+}
+
+// cchPattern 匹配 cch=xxx; 部分（包括前后空格）
+var cchPattern = regexp.MustCompile(`\s*cch=[^;]*;\s*`)
+
+// RemoveBillingHeaders 移除请求体 system 数组中第一个包含 cch= 的文本块的 cch 参数
+// 仅移除 cch=xxx; 部分，保留其他计费参数（如 cc_version、cc_entrypoint）
+// enableLog: 是否输出日志（由 envCfg.EnableRequestLogs 控制）
+// apiType: 接口类型（Messages/Responses/Gemini），用于日志标签前缀
+func RemoveBillingHeaders(bodyBytes []byte, enableLog bool, apiType string) ([]byte, bool) {
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	decoder.UseNumber() // 保留数字精度
+
+	var data map[string]interface{}
+	if err := decoder.Decode(&data); err != nil {
+		return bodyBytes, false
+	}
+
+	systemArr, ok := data["system"].([]interface{})
+	if !ok || len(systemArr) == 0 {
+		return bodyBytes, false
+	}
+
+	modified := false
+	for _, item := range systemArr {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		text, ok := itemMap["text"].(string)
+		if !ok || !strings.Contains(text, "cch=") {
+			continue
+		}
+
+		// 移除 cch=xxx; 部分
+		newText := cchPattern.ReplaceAllString(text, "")
+		// 清理末尾多余空格
+		newText = strings.TrimRight(newText, " ")
+		itemMap["text"] = newText
+		modified = true
+
+		if enableLog {
+			log.Printf("[%s-Preprocess] 已移除 system 文本块中的 cch 计费参数", apiType)
+		}
+		break // 只处理第一个匹配的元素
+	}
+
+	if !modified {
+		return bodyBytes, false
+	}
+
+	newBytes, err := utils.MarshalJSONNoEscape(data)
+	if err != nil {
+		return bodyBytes, false
+	}
+	return newBytes, true
 }
