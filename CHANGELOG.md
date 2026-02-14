@@ -4,6 +4,14 @@
 
 ---
 
+## [v2.6.15] - 2026-02-14
+
+### 修复
+
+- **Messages API 空响应误判 tool_use/thinking 响应** - `PreflightStreamEvents` 预检测仅通过 `delta.text` 判断内容是否为空，导致纯 tool_use（工具调用）、thinking（思考）、server_tool_use 等非文本 content block 响应被误判为空响应并触发不必要的重试；新增 `hasNonTextContentBlock` 检测，遇到非文本 content block 时立即放行
+
+---
+
 ## [v2.6.14] - 2026-02-14
 
 ### 新增

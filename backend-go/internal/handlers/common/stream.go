@@ -40,6 +40,7 @@ type StreamPreflightResult struct {
 func PreflightStreamEvents(eventChan <-chan string, errChan <-chan error) *StreamPreflightResult {
 	result := &StreamPreflightResult{}
 	var textBuf bytes.Buffer
+	hasNonTextContent := false // tool_use / thinking 等非文本 content block
 	timeout := time.NewTimer(30 * time.Second)
 	defer timeout.Stop()
 
@@ -48,10 +49,19 @@ func PreflightStreamEvents(eventChan <-chan string, errChan <-chan error) *Strea
 		case event, ok := <-eventChan:
 			if !ok {
 				// eventChan 关闭：流结束
+				if hasNonTextContent {
+					return result // 有非文本内容，视为非空
+				}
 				result.IsEmpty = isEmptyContent(textBuf.String())
 				return result
 			}
 			result.BufferedEvents = append(result.BufferedEvents, event)
+
+			// 检测非文本 content block（tool_use / thinking）
+			if !hasNonTextContent && hasNonTextContentBlock(event) {
+				hasNonTextContent = true
+				return result // 有效内容，立即放行
+			}
 
 			// 提取文本内容
 			ExtractTextFromEvent(event, &textBuf)
@@ -64,6 +74,9 @@ func PreflightStreamEvents(eventChan <-chan string, errChan <-chan error) *Strea
 
 			// 检查是否为 message_stop 事件（流正常结束）
 			if IsMessageStopEvent(event) {
+				if hasNonTextContent {
+					return result
+				}
 				result.IsEmpty = isEmptyContent(textBuf.String())
 				return result
 			}
@@ -90,6 +103,33 @@ func PreflightStreamEvents(eventChan <-chan string, errChan <-chan error) *Strea
 // isEmptyContent 判断流式响应的累积文本是否为空内容
 func isEmptyContent(text string) bool {
 	return text == "" || strings.TrimSpace(text) == "{"
+}
+
+// hasNonTextContentBlock 检测 SSE 事件是否包含非文本 content block（tool_use / thinking）
+// 这些 content block 不产生 delta.text，但属于有效响应内容
+func hasNonTextContentBlock(event string) bool {
+	for _, line := range strings.Split(event, "\n") {
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		jsonStr := strings.TrimPrefix(line, "data: ")
+
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+			continue
+		}
+
+		// content_block_start 事件中检查 content_block.type
+		if cb, ok := data["content_block"].(map[string]interface{}); ok {
+			if cbType, ok := cb["type"].(string); ok {
+				switch cbType {
+				case "tool_use", "thinking", "server_tool_use":
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // drainChannels 排空 eventChan 和 errChan，防止 provider goroutine 泄漏

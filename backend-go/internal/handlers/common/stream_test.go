@@ -330,3 +330,119 @@ func TestPatchTokensInEventWithCache(t *testing.T) {
 		}
 	})
 }
+
+func TestPreflightStreamEvents_ToolUseNotEmpty(t *testing.T) {
+	// 模拟纯 tool_use 响应：message_start → content_block_start(tool_use) → ... → message_stop
+	// 这类响应没有 delta.text，但不应被判定为空响应
+	events := []string{
+		"event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_test\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-20250514\",\"usage\":{\"input_tokens\":478,\"output_tokens\":1}}}\n\n",
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_test\",\"name\":\"Bash\",\"input\":{}}}\n\n",
+		"event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"command\\\":\\\"ls\\\"}\"}}\n\n",
+		"event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+		"event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"input_tokens\":2559,\"output_tokens\":23}}\n\n",
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+	}
+
+	eventChan := make(chan string, len(events))
+	errChan := make(chan error)
+	for _, e := range events {
+		eventChan <- e
+	}
+	close(eventChan)
+	close(errChan)
+
+	result := PreflightStreamEvents(eventChan, errChan)
+	if result.IsEmpty {
+		t.Errorf("tool_use response should NOT be detected as empty, got IsEmpty=true (buffered %d events)", len(result.BufferedEvents))
+	}
+}
+
+func TestPreflightStreamEvents_ThinkingNotEmpty(t *testing.T) {
+	// 模拟 thinking 响应
+	events := []string{
+		"event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_test\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-20250514\",\"usage\":{\"input_tokens\":100,\"output_tokens\":1}}}\n\n",
+		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n",
+	}
+
+	eventChan := make(chan string, len(events))
+	errChan := make(chan error)
+	for _, e := range events {
+		eventChan <- e
+	}
+	close(eventChan)
+	close(errChan)
+
+	result := PreflightStreamEvents(eventChan, errChan)
+	if result.IsEmpty {
+		t.Errorf("thinking response should NOT be detected as empty, got IsEmpty=true")
+	}
+}
+
+func TestPreflightStreamEvents_TrueEmptyStillDetected(t *testing.T) {
+	// 真正的空响应：有 message_start 和 message_stop 但没有任何 content block
+	events := []string{
+		"event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_test\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-20250514\",\"usage\":{\"input_tokens\":100,\"output_tokens\":0}}}\n\n",
+		"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+	}
+
+	eventChan := make(chan string, len(events))
+	errChan := make(chan error)
+	for _, e := range events {
+		eventChan <- e
+	}
+	close(eventChan)
+	close(errChan)
+
+	result := PreflightStreamEvents(eventChan, errChan)
+	if !result.IsEmpty {
+		t.Errorf("truly empty response should be detected as empty, got IsEmpty=false")
+	}
+}
+
+func TestHasNonTextContentBlock(t *testing.T) {
+	tests := []struct {
+		name  string
+		event string
+		want  bool
+	}{
+		{
+			name:  "tool_use content block",
+			event: "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_test\",\"name\":\"Bash\",\"input\":{}}}\n\n",
+			want:  true,
+		},
+		{
+			name:  "thinking content block",
+			event: "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n",
+			want:  true,
+		},
+		{
+			name:  "server_tool_use content block",
+			event: "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_test\",\"name\":\"web_search\"}}\n\n",
+			want:  true,
+		},
+		{
+			name:  "text content block - not non-text",
+			event: "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+			want:  false,
+		},
+		{
+			name:  "message_start - not content block",
+			event: "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_test\"}}\n\n",
+			want:  false,
+		},
+		{
+			name:  "content_block_delta - no content_block field",
+			event: "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{}\"}}\n\n",
+			want:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasNonTextContentBlock(tt.event)
+			if got != tt.want {
+				t.Errorf("hasNonTextContentBlock() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
