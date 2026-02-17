@@ -4,6 +4,14 @@
 
 ---
 
+## [Unreleased]
+
+### 新增
+
+- **渠道日志接口类型标识** - `ChannelLog` 新增 `interfaceType` 字段，记录请求来源接口类型（Messages/Responses/Gemini），前端日志列表以彩色标签展示
+
+---
+
 ## [v2.6.15] - 2026-02-14
 
 ### 修复

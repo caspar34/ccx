@@ -245,6 +245,7 @@ export interface ChannelLogEntry {
   baseUrl: string
   errorInfo: string
   isRetry: boolean
+  interfaceType?: string  // 接口类型（Messages/Responses/Gemini）
 }
 
 export interface ChannelLogsResponse {

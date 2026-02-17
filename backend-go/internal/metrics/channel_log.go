@@ -17,6 +17,7 @@ type ChannelLog struct {
 	BaseURL       string    `json:"baseUrl"`
 	ErrorInfo     string    `json:"errorInfo"`
 	IsRetry       bool      `json:"isRetry"`
+	InterfaceType string    `json:"interfaceType"` // 接口类型（Messages/Responses/Gemini）
 }
 
 const maxChannelLogs = 50

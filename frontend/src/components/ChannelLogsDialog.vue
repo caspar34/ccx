@@ -36,6 +36,9 @@
               </template>
               <v-list-item-title class="d-flex align-center ga-2 text-body-2 flex-wrap">
                 <span class="text-medium-emphasis text-caption">{{ formatTime(log.timestamp) }}</span>
+                <v-chip v-if="log.interfaceType" size="x-small" :color="interfaceTypeColor(log.interfaceType)" variant="tonal" class="text-uppercase">
+                  {{ log.interfaceType }}
+                </v-chip>
                 <span v-if="log.originalModel" class="text-caption text-medium-emphasis">{{ log.originalModel }} →</span>
                 <span class="font-weight-medium">{{ log.model }}</span>
                 <span class="text-caption text-medium-emphasis">{{ log.durationMs }}ms</span>
@@ -86,6 +89,15 @@ const statusColor = (code: number): string => {
   if (code >= 200 && code < 300) return 'success'
   if (code >= 400 && code < 500) return 'warning'
   return 'error'
+}
+
+const interfaceTypeColor = (type: string): string => {
+  switch (type.toLowerCase()) {
+    case 'messages': return 'primary'
+    case 'responses': return 'secondary'
+    case 'gemini': return 'info'
+    default: return 'default'
+  }
 }
 
 const formatTime = (ts: string): string => {

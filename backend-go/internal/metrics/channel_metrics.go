@@ -2433,8 +2433,8 @@ type GlobalStatsSummary struct {
 
 // GlobalStatsHistoryResponse 全局统计响应
 type GlobalStatsHistoryResponse struct {
-	DataPoints      []GlobalHistoryDataPoint          `json:"dataPoints"`
-	Summary         GlobalStatsSummary                `json:"summary"`
+	DataPoints      []GlobalHistoryDataPoint           `json:"dataPoints"`
+	Summary         GlobalStatsSummary                 `json:"summary"`
 	ModelDataPoints map[string][]ModelHistoryDataPoint `json:"modelDataPoints,omitempty"`
 }
 

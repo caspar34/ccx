@@ -182,6 +182,7 @@ func TryUpstreamWithAllKeys(
 						BaseURL:       currentBaseURL,
 						ErrorInfo:     errInfo,
 						IsRetry:       attempt > 0 || urlIdx > 0,
+						InterfaceType: apiType,
 					})
 				}
 				log.Printf("[%s-Key] 警告: API密钥失败: %v", apiType, err)
@@ -227,6 +228,7 @@ func TryUpstreamWithAllKeys(
 							BaseURL:       currentBaseURL,
 							ErrorInfo:     errInfo,
 							IsRetry:       attempt > 0 || urlIdx > 0,
+							InterfaceType: apiType,
 						})
 					}
 
@@ -256,6 +258,7 @@ func TryUpstreamWithAllKeys(
 						BaseURL:       currentBaseURL,
 						ErrorInfo:     errInfo,
 						IsRetry:       attempt > 0 || urlIdx > 0,
+						InterfaceType: apiType,
 					})
 				}
 				c.Data(resp.StatusCode, "application/json", respBodyBytes)
@@ -308,6 +311,7 @@ func TryUpstreamWithAllKeys(
 							BaseURL:       currentBaseURL,
 							ErrorInfo:     errInfo,
 							IsRetry:       attempt > 0 || urlIdx > 0,
+							InterfaceType: apiType,
 						})
 					}
 					log.Printf("[%s-InvalidResponse] 上游返回无效响应 (Key: %s): %v，尝试下一个密钥", apiType, utils.MaskAPIKey(apiKey), err)
@@ -334,6 +338,7 @@ func TryUpstreamWithAllKeys(
 							BaseURL:       currentBaseURL,
 							ErrorInfo:     errInfo,
 							IsRetry:       attempt > 0 || urlIdx > 0,
+							InterfaceType: apiType,
 						})
 					}
 					log.Printf("[%s-Key] 警告: 响应处理失败: %v", apiType, err)
@@ -355,6 +360,7 @@ func TryUpstreamWithAllKeys(
 					KeyMask:       utils.MaskAPIKey(apiKey),
 					BaseURL:       currentBaseURL,
 					IsRetry:       attempt > 0 || urlIdx > 0,
+					InterfaceType: apiType,
 				})
 			}
 			return true, apiKey, originalIdx, nil, usage, nil
