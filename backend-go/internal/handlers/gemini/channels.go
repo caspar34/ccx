@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
+	"github.com/BenedictKing/ccx/internal/httpclient"
 	"github.com/BenedictKing/ccx/internal/scheduler"
 	"github.com/gin-gonic/gin"
 )
@@ -344,7 +345,7 @@ func PingChannel(cfgManager *config.ConfigManager) gin.HandlerFunc {
 		}
 
 		// 简单的连通性测试
-		client := &http.Client{Timeout: 10 * time.Second}
+		client := httpclient.GetManager().GetStandardClient(10*time.Second, upstream.InsecureSkipVerify, upstream.ProxyURL)
 		testURL := fmt.Sprintf("%s/v1beta/models", strings.TrimRight(baseURL, "/"))
 
 		req, _ := http.NewRequest("GET", testURL, nil)
@@ -380,8 +381,6 @@ func PingAllChannels(cfgManager *config.ConfigManager) gin.HandlerFunc {
 		cfg := cfgManager.GetConfig()
 		results := make([]gin.H, len(cfg.GeminiUpstream))
 
-		client := &http.Client{Timeout: 10 * time.Second}
-
 		for i, upstream := range cfg.GeminiUpstream {
 			baseURL := upstream.GetEffectiveBaseURL()
 			if baseURL == "" {
@@ -393,6 +392,9 @@ func PingAllChannels(cfgManager *config.ConfigManager) gin.HandlerFunc {
 				}
 				continue
 			}
+
+			// 每个渠道使用各自的代理配置
+			client := httpclient.GetManager().GetStandardClient(10*time.Second, upstream.InsecureSkipVerify, upstream.ProxyURL)
 
 			testURL := fmt.Sprintf("%s/v1beta/models", strings.TrimRight(baseURL, "/"))
 			req, _ := http.NewRequest("GET", testURL, nil)

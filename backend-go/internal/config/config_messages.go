@@ -189,6 +189,9 @@ func (cm *ConfigManager) UpdateUpstream(index int, updates UpstreamUpdate) (shou
 	if updates.CustomHeaders != nil {
 		upstream.CustomHeaders = updates.CustomHeaders
 	}
+	if updates.ProxyURL != nil {
+		upstream.ProxyURL = *updates.ProxyURL
+	}
 
 	if err := cm.saveConfigLocked(cm.config); err != nil {
 		return false, err

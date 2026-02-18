@@ -403,7 +403,7 @@ func pingChannelURLs(ch *config.UpstreamConfig) gin.H {
 
 	// 单个 URL 直接测试
 	if len(urls) == 1 {
-		return pingURL(urls[0], ch.InsecureSkipVerify)
+		return pingURL(urls[0], ch.InsecureSkipVerify, ch.ProxyURL)
 	}
 
 	// 多个 URL 并发测试，返回最快的
@@ -419,7 +419,7 @@ func pingChannelURLs(ch *config.UpstreamConfig) gin.H {
 		go func(testURL string) {
 			startTime := time.Now()
 			testURL = strings.TrimSuffix(testURL, "/")
-			client := httpclient.GetManager().GetStandardClient(5*time.Second, ch.InsecureSkipVerify)
+			client := httpclient.GetManager().GetStandardClient(5*time.Second, ch.InsecureSkipVerify, ch.ProxyURL)
 			req, err := http.NewRequest("HEAD", testURL, nil)
 			if err != nil {
 				results <- pingResult{url: testURL, latency: 0, success: false, err: "req_creation_failed"}
@@ -462,10 +462,10 @@ func pingChannelURLs(ch *config.UpstreamConfig) gin.H {
 }
 
 // pingURL 测试单个 URL
-func pingURL(testURL string, insecureSkipVerify bool) gin.H {
+func pingURL(testURL string, insecureSkipVerify bool, proxyURL string) gin.H {
 	startTime := time.Now()
 	testURL = strings.TrimSuffix(testURL, "/")
-	client := httpclient.GetManager().GetStandardClient(5*time.Second, insecureSkipVerify)
+	client := httpclient.GetManager().GetStandardClient(5*time.Second, insecureSkipVerify, proxyURL)
 	req, err := http.NewRequest("HEAD", testURL, nil)
 	if err != nil {
 		return gin.H{"success": false, "latency": 0, "status": "error", "error": "req_creation_failed"}

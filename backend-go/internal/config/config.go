@@ -35,6 +35,8 @@ type UpstreamConfig struct {
 	StripThoughtSignature       bool `json:"stripThoughtSignature,omitempty"`       // 移除 thought_signature 字段（兼容旧版 Gemini API）
 	// 自定义请求头
 	CustomHeaders map[string]string `json:"customHeaders,omitempty"` // 自定义请求头（覆盖或添加到上游请求）
+	// 渠道级代理
+	ProxyURL string `json:"proxyUrl,omitempty"` // HTTP/HTTPS/SOCKS5 代理地址
 }
 
 // UpstreamUpdate 用于部分更新 UpstreamConfig
@@ -58,6 +60,8 @@ type UpstreamUpdate struct {
 	StripThoughtSignature       *bool `json:"stripThoughtSignature"`
 	// 自定义请求头
 	CustomHeaders map[string]string `json:"customHeaders"`
+	// 渠道级代理
+	ProxyURL *string `json:"proxyUrl"`
 }
 
 // Config 配置结构

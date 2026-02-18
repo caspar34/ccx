@@ -106,6 +106,7 @@ import {
   mdiHistory,
   mdiFormatListBulleted,
   mdiTagOff,
+  mdiShieldLockOutline,
 } from '@mdi/js'
 
 // 图标名称到 SVG path 的映射 (使用 kebab-case)
@@ -191,6 +192,7 @@ const iconMap: Record<string, string> = {
   // 防护盾牌图标
   'shield-refresh': mdiShieldRefresh,
   'shield-off-outline': mdiShieldOffOutline,
+  'shield-lock-outline': mdiShieldLockOutline,
 
   // 功能图标
   'key': mdiKey,

@@ -620,6 +620,21 @@
                 </v-card-text>
               </v-card>
             </v-col>
+
+            <!-- 代理 URL -->
+            <v-col cols="12">
+              <v-text-field
+                v-model="form.proxyUrl"
+                label="代理 URL (可选)"
+                placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                prepend-inner-icon="mdi-shield-lock-outline"
+                hint="支持 HTTP/HTTPS/SOCKS5 代理，用于通过代理访问上游服务"
+                persistent-hint
+                clearable
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
           </v-row>
         </v-form>
       </v-card-text>
@@ -1093,7 +1108,8 @@ const form = reactive({
   description: '',
   apiKeys: [] as string[],
   modelMapping: {} as Record<string, string>,
-  customHeaders: {} as Record<string, string>
+  customHeaders: {} as Record<string, string>,
+  proxyUrl: ''
 })
 
 // 多 BaseURL 文本输入（独立变量，保留用户输入的换行）
@@ -1297,6 +1313,7 @@ const resetForm = () => {
   form.apiKeys = []
   form.modelMapping = {}
   form.customHeaders = {}
+  form.proxyUrl = ''
   newApiKey.value = ''
   newMapping.source = ''
   newMapping.target = ''
@@ -1360,6 +1377,7 @@ const loadChannelData = (channel: Channel) => {
 
   form.modelMapping = { ...(channel.modelMapping || {}) }
   form.customHeaders = { ...(channel.customHeaders || {}) }
+  form.proxyUrl = channel.proxyUrl || ''
 
   // 立即同步 baseUrl 到预览变量，避免等待 debounce
   formBaseUrlPreview.value = channel.baseUrl
@@ -1634,7 +1652,8 @@ const handleSubmit = async () => {
     description: form.description.trim(),
     apiKeys: processedApiKeys,
     modelMapping: form.modelMapping,
-    customHeaders: form.customHeaders  // 始终传递，空对象表示清除
+    customHeaders: form.customHeaders,  // 始终传递，空对象表示清除
+    proxyUrl: form.proxyUrl.trim()
   }
 
   // 多 BaseURL 支持

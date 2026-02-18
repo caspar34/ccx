@@ -1,3 +1,18 @@
+## [Unreleased]
+
+### 新增
+
+- **渠道级代理（Proxy）支持** - 为每个渠道配置独立的 HTTP/SOCKS5 代理，用于通过代理访问特定上游服务（网络隔离、地域限制等场景）
+  - 后端：`UpstreamConfig` 新增 `ProxyURL` 字段，`GetStandardClient`/`GetStreamClient` 支持代理配置，`SendRequest` 传递代理参数并记录脱敏日志
+  - 前端：渠道编辑表单新增代理 URL 输入框，`Channel` 接口支持 `proxyUrl` 字段
+  - Ping 适配：Messages 和 Gemini 渠道连通性测试均通过渠道代理发送
+
+### 变更
+
+- **Go 依赖升级** - `golang.org/x/net` 升级到 v0.50.0（直接依赖），支持 SOCKS5 代理功能
+
+---
+
 # 版本历史
 
 > **注意**: v2.0.0 开始为 Go 语言重写版本，v1.x 为 TypeScript 版本

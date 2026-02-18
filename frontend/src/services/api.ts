@@ -92,6 +92,7 @@ export interface Channel {
   insecureSkipVerify?: boolean
   modelMapping?: Record<string, string>
   customHeaders?: Record<string, string>  // 自定义请求头
+  proxyUrl?: string                        // HTTP/HTTPS/SOCKS5 代理 URL
   latency?: number
   status?: ChannelStatus | 'healthy' | 'error' | 'unknown' | ''
   index: number

@@ -55,10 +55,10 @@ func SendRequest(req *http.Request, upstream *config.UpstreamConfig, envCfg *con
 
 	var client *http.Client
 	if isStream {
-		client = clientManager.GetStreamClient(upstream.InsecureSkipVerify)
+		client = clientManager.GetStreamClient(upstream.InsecureSkipVerify, upstream.ProxyURL)
 	} else {
 		timeout := time.Duration(envCfg.RequestTimeout) * time.Millisecond
-		client = clientManager.GetStandardClient(timeout, upstream.InsecureSkipVerify)
+		client = clientManager.GetStandardClient(timeout, upstream.InsecureSkipVerify, upstream.ProxyURL)
 	}
 
 	if upstream.InsecureSkipVerify && envCfg.EnableRequestLogs {
@@ -68,6 +68,11 @@ func SendRequest(req *http.Request, upstream *config.UpstreamConfig, envCfg *con
 	if envCfg.EnableRequestLogs {
 		log.Printf("[%s-Request-URL] 实际请求URL: %s", apiType, req.URL.String())
 		log.Printf("[%s-Request-Method] 请求方法: %s", apiType, req.Method)
+		if upstream.ProxyURL != "" {
+			// 对代理 URL 进行脱敏处理，避免泄露凭证
+			redactedProxyURL := utils.RedactURLCredentials(upstream.ProxyURL)
+			log.Printf("[%s-Request-Proxy] 使用代理: %s", apiType, redactedProxyURL)
+		}
 		if envCfg.IsDevelopment() {
 			logRequestDetails(req, envCfg, apiType)
 		}
