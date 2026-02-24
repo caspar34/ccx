@@ -84,7 +84,7 @@ func (cm *ConfigManager) SetChatChannelPromotion(index int, duration time.Durati
 func (cm *ConfigManager) SetChatLoadBalance(strategy string) error
 ```
 
-> `clearFailedKeysForUpstream` 调用时 apiType 传 `"Chat"`。
+> `clearFailedKeysForUpstream` 调用时 apiType 传 `"chat"`（与 `ChannelKindChat` 一致）。
 > `DeprioritizeAPIKey` 需扩展遍历 `ChatUpstream`。
 
 ### 2.3 Chat Handler
@@ -225,11 +225,13 @@ apiGroup.POST("/chat/channels/:id/keys/:apiKey/top", chat.MoveApiKeyToTop(cfgMan
 apiGroup.POST("/chat/channels/:id/keys/:apiKey/bottom", chat.MoveApiKeyToBottom(cfgManager))
 apiGroup.POST("/chat/channels/reorder", chat.ReorderChannels(cfgManager))
 apiGroup.PATCH("/chat/channels/:id/status", chat.SetChannelStatus(cfgManager))
-apiGroup.POST("/chat/channels/:id/resume", handlers.ResumeChannel(channelScheduler, /* chat kind */))
+// 注意：ResumeChannel / GetChannelMetrics* 当前实现使用 isResponses bool 区分类型，
+// 实施时需重构为接收 scheduler.ChannelKind 参数，以支持 chat 类型。
+apiGroup.POST("/chat/channels/:id/resume", handlers.ResumeChannel(channelScheduler, scheduler.ChannelKindChat))
 apiGroup.POST("/chat/channels/:id/promotion", chat.SetChannelPromotion(cfgManager))
-apiGroup.GET("/chat/channels/metrics", handlers.GetChannelMetricsWithConfig(chatMetricsManager, cfgManager, /* chat */))
-apiGroup.GET("/chat/channels/metrics/history", handlers.GetChannelMetricsHistory(chatMetricsManager, cfgManager, /* chat */))
-apiGroup.GET("/chat/channels/:id/keys/metrics/history", handlers.GetChannelKeyMetricsHistory(chatMetricsManager, cfgManager, /* chat */))
+apiGroup.GET("/chat/channels/metrics", handlers.GetChannelMetricsWithConfig(chatMetricsManager, cfgManager, scheduler.ChannelKindChat))
+apiGroup.GET("/chat/channels/metrics/history", handlers.GetChannelMetricsHistory(chatMetricsManager, cfgManager, scheduler.ChannelKindChat))
+apiGroup.GET("/chat/channels/:id/keys/metrics/history", handlers.GetChannelKeyMetricsHistory(chatMetricsManager, cfgManager, scheduler.ChannelKindChat))
 apiGroup.GET("/chat/channels/dashboard", chat.GetDashboard(cfgManager, channelScheduler))
 apiGroup.GET("/chat/channels/scheduler/stats", handlers.GetSchedulerStats(channelScheduler))
 apiGroup.GET("/chat/global/stats/history", handlers.GetGlobalStatsHistory(chatMetricsManager))
