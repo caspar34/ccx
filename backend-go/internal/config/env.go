@@ -10,6 +10,7 @@ type EnvConfig struct {
 	Env                  string
 	EnableWebUI          bool
 	ProxyAccessKey       string
+	AdminAccessKey       string // 管理 API 独立密钥（可选，未设置时回退到 ProxyAccessKey）
 	LogLevel             string
 	EnableRequestLogs    bool
 	EnableResponseLogs   bool
@@ -53,6 +54,7 @@ func NewEnvConfig() *EnvConfig {
 		Env:                  env,
 		EnableWebUI:          getEnv("ENABLE_WEB_UI", "true") != "false",
 		ProxyAccessKey:       getEnv("PROXY_ACCESS_KEY", "your-proxy-access-key"),
+		AdminAccessKey:       getEnv("ADMIN_ACCESS_KEY", ""), // 空值时回退到 ProxyAccessKey
 		LogLevel:             getEnv("LOG_LEVEL", "info"),
 		EnableRequestLogs:    getEnv("ENABLE_REQUEST_LOGS", "true") != "false",
 		EnableResponseLogs:   getEnv("ENABLE_RESPONSE_LOGS", "true") != "false",
@@ -63,7 +65,7 @@ func NewEnvConfig() *EnvConfig {
 
 		RequestTimeout:     getEnvAsInt("REQUEST_TIMEOUT", 300000),
 		MaxRequestBodySize: getEnvAsInt64("MAX_REQUEST_BODY_SIZE_MB", 50) * 1024 * 1024, // MB 转换为字节
-		EnableCORS:         getEnv("ENABLE_CORS", "true") != "false",
+		EnableCORS:         getEnv("ENABLE_CORS", "false") == "true",
 		CORSOrigin:         getEnv("CORS_ORIGIN", "*"),
 		// 指标配置
 		MetricsWindowSize:       getEnvAsInt("METRICS_WINDOW_SIZE", 10),
@@ -87,6 +89,14 @@ func NewEnvConfig() *EnvConfig {
 // IsDevelopment 是否为开发环境
 func (c *EnvConfig) IsDevelopment() bool {
 	return c.Env == "development"
+}
+
+// GetAdminAccessKey 获取管理 API 密钥（未设置时回退到 ProxyAccessKey）
+func (c *EnvConfig) GetAdminAccessKey() string {
+	if c.AdminAccessKey != "" {
+		return c.AdminAccessKey
+	}
+	return c.ProxyAccessKey
 }
 
 // IsProduction 是否为生产环境

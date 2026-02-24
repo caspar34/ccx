@@ -51,7 +51,7 @@ func WebAuthMiddleware(envCfg *config.EnvConfig, cfgManager *config.ConfigManage
 		// 检查访问密钥（管理 API + 管理端点）
 		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/admin") {
 			providedKey := getAPIKey(c)
-			expectedKey := envCfg.ProxyAccessKey
+			expectedKey := envCfg.GetAdminAccessKey() // 使用独立的管理密钥
 
 			// 记录认证尝试
 			clientIP := c.ClientIP()

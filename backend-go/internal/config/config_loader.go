@@ -107,7 +107,7 @@ func (cm *ConfigManager) createDefaultConfig() error {
 		StripBillingHeader:       true, // 默认启用移除计费头
 	}
 
-	if err := os.MkdirAll(filepath.Dir(cm.configFile), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cm.configFile), 0700); err != nil {
 		return err
 	}
 
@@ -277,7 +277,7 @@ func (cm *ConfigManager) saveConfigLocked(config Config) error {
 	}
 
 	cm.config = config
-	return os.WriteFile(cm.configFile, data, 0644)
+	return os.WriteFile(cm.configFile, data, 0600) // 仅所有者可读写，保护敏感配置
 }
 
 // SaveConfig 保存配置
@@ -294,7 +294,7 @@ func (cm *ConfigManager) backupConfig() {
 	}
 
 	backupDir := filepath.Join(filepath.Dir(cm.configFile), "backups")
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0700); err != nil { // 仅所有者可访问
 		log.Printf("[Config-Backup] 警告: 创建备份目录失败: %v", err)
 		return
 	}
@@ -309,7 +309,7 @@ func (cm *ConfigManager) backupConfig() {
 	// 创建备份文件
 	timestamp := time.Now().Format("2006-01-02T15-04-05")
 	backupFile := filepath.Join(backupDir, fmt.Sprintf("config-%s.json", timestamp))
-	if err := os.WriteFile(backupFile, data, 0644); err != nil {
+	if err := os.WriteFile(backupFile, data, 0600); err != nil { // 仅所有者可读写
 		log.Printf("[Config-Backup] 警告: 写入备份文件失败: %v", err)
 		return
 	}

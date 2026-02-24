@@ -76,6 +76,10 @@ func (cm *ClientManager) GetStandardClient(timeout time.Duration, insecure bool,
 
 	if insecure {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		envCfg := config.NewEnvConfig()
+		if envCfg.IsProduction() {
+			log.Printf("[HttpClient-Warn] 生产环境启用了 insecureSkipVerify，存在中间人攻击风险")
+		}
 	}
 
 	applyProxy(transport, proxyAddr)

@@ -311,9 +311,17 @@ func main() {
 	fmt.Printf("[Server-Info] Chat Completions: POST /v1/chat/completions\n")
 	fmt.Printf("[Server-Info] 健康检查: GET /health\n")
 	fmt.Printf("[Server-Info] 环境: %s\n", envCfg.Env)
+	// 生产环境检查：必须设置有效的访问密钥
+	if envCfg.IsProduction() && envCfg.ProxyAccessKey == "your-proxy-access-key" {
+		log.Fatal("[Server-Fatal] 生产环境必须设置 PROXY_ACCESS_KEY，禁止使用默认值")
+	}
 	// 检查是否使用默认密码，给予提示
 	if envCfg.ProxyAccessKey == "your-proxy-access-key" {
 		fmt.Printf("[Server-Warn] 访问密钥: your-proxy-access-key (默认值，建议通过 .env 文件修改)\n")
+	}
+	// 提示管理密钥配置状态
+	if envCfg.AdminAccessKey != "" {
+		fmt.Printf("[Server-Info] 管理密钥: 已配置独立 ADMIN_ACCESS_KEY\n")
 	}
 	fmt.Printf("\n")
 
@@ -322,6 +330,7 @@ func main() {
 		Addr:              addr,
 		Handler:           r,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       time.Duration(envCfg.RequestTimeout) * time.Millisecond, // 与请求超时一致
 		IdleTimeout:       120 * time.Second,
 	}
 
