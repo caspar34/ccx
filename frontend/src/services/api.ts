@@ -254,7 +254,6 @@ export interface ChannelLogsResponse {
   logs: ChannelLogEntry[]
 }
 
-
 // ============== 渠道实时活跃度类型 ==============
 
 // 活跃度分段数据（每 6 秒一段）
@@ -734,7 +733,6 @@ class ApiService {
   async getChannelLogs(type: 'messages' | 'responses' | 'gemini' | 'chat', channelId: number): Promise<ChannelLogsResponse> {
     return this.request(`/${type}/channels/${channelId}/logs`)
   }
-
 
   // ============== Chat 渠道管理 API ==============
 
