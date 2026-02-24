@@ -596,32 +596,34 @@ func streamPassthrough(
 ) *types.Usage {
 	var totalUsage *types.Usage
 	buf := make([]byte, 32*1024)
+	var remainder string
 
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
-			// 尝试从数据中提取 usage
-			chunk := string(buf[:n])
-			if strings.Contains(chunk, "\"usage\"") {
-				// 尝试解析最后一个 data: 行中的 usage
-				lines := strings.Split(chunk, "\n")
-				for _, line := range lines {
-					if !strings.HasPrefix(line, "data: ") {
-						continue
-					}
-					jsonData := strings.TrimPrefix(line, "data: ")
-					if jsonData == "[DONE]" {
-						continue
-					}
-					var parsed map[string]interface{}
-					if json.Unmarshal([]byte(jsonData), &parsed) == nil {
-						if u, ok := parsed["usage"].(map[string]interface{}); ok {
-							promptTokens, _ := u["prompt_tokens"].(float64)
-							completionTokens, _ := u["completion_tokens"].(float64)
-							totalUsage = &types.Usage{
-								InputTokens:  int(promptTokens),
-								OutputTokens: int(completionTokens),
-							}
+			// 使用行缓冲机制避免跨 chunk 截断
+			data := remainder + string(buf[:n])
+			lines := strings.Split(data, "\n")
+			remainder = lines[len(lines)-1]
+			completeLines := lines[:len(lines)-1]
+
+			// 尝试从完整行中提取 usage
+			for _, line := range completeLines {
+				if !strings.HasPrefix(line, "data: ") {
+					continue
+				}
+				jsonData := strings.TrimPrefix(line, "data: ")
+				if jsonData == "[DONE]" {
+					continue
+				}
+				var parsed map[string]interface{}
+				if json.Unmarshal([]byte(jsonData), &parsed) == nil {
+					if u, ok := parsed["usage"].(map[string]interface{}); ok {
+						promptTokens, _ := u["prompt_tokens"].(float64)
+						completionTokens, _ := u["completion_tokens"].(float64)
+						totalUsage = &types.Usage{
+							InputTokens:  int(promptTokens),
+							OutputTokens: int(completionTokens),
 						}
 					}
 				}
@@ -648,6 +650,7 @@ func streamClaudeToChat(
 	model string,
 ) *types.Usage {
 	var totalUsage *types.Usage
+	var doneSent bool
 	buf := make([]byte, 32*1024)
 	var remainder string
 
@@ -670,6 +673,7 @@ func streamClaudeToChat(
 					if flusher != nil {
 						flusher.Flush()
 					}
+					doneSent = true
 					continue
 				}
 
@@ -767,10 +771,12 @@ func streamClaudeToChat(
 		}
 	}
 
-	// 确保发送 [DONE]
-	fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
-	if flusher != nil {
-		flusher.Flush()
+	// 确保发送 [DONE]（仅在未发送过时）
+	if !doneSent {
+		fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
 	}
 
 	return totalUsage
