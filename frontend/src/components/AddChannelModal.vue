@@ -334,6 +334,7 @@
                                 :text="keyModelsStatus.get(key)?.error"
                                 location="top"
                                 max-width="300"
+                                content-class="key-tooltip"
                               >
                                 <template #activator="{ props: tooltipProps }">
                                   <v-chip
