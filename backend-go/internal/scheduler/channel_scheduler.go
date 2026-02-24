@@ -21,11 +21,13 @@ type ChannelScheduler struct {
 	messagesMetricsManager   *metrics.MetricsManager // Messages 渠道指标
 	responsesMetricsManager  *metrics.MetricsManager // Responses 渠道指标
 	geminiMetricsManager     *metrics.MetricsManager // Gemini 渠道指标
+	chatMetricsManager       *metrics.MetricsManager // Chat 渠道指标
 	traceAffinity            *session.TraceAffinityManager
 	urlManager               *warmup.URLManager       // URL 管理器（非阻塞，动态排序）
 	messagesChannelLogStore  *metrics.ChannelLogStore // Messages 渠道请求日志
 	responsesChannelLogStore *metrics.ChannelLogStore // Responses 渠道请求日志
 	geminiChannelLogStore    *metrics.ChannelLogStore // Gemini 渠道请求日志
+	chatChannelLogStore      *metrics.ChannelLogStore // Chat 渠道请求日志
 }
 
 // ChannelKind 标识调度器所处理的渠道类型
@@ -37,6 +39,7 @@ const (
 	ChannelKindMessages  ChannelKind = "messages"
 	ChannelKindResponses ChannelKind = "responses"
 	ChannelKindGemini    ChannelKind = "gemini"
+	ChannelKindChat      ChannelKind = "chat"
 )
 
 // NewChannelScheduler 创建多渠道调度器
@@ -45,6 +48,7 @@ func NewChannelScheduler(
 	messagesMetrics *metrics.MetricsManager,
 	responsesMetrics *metrics.MetricsManager,
 	geminiMetrics *metrics.MetricsManager,
+	chatMetrics *metrics.MetricsManager,
 	traceAffinity *session.TraceAffinityManager,
 	urlMgr *warmup.URLManager,
 ) *ChannelScheduler {
@@ -53,11 +57,13 @@ func NewChannelScheduler(
 		messagesMetricsManager:   messagesMetrics,
 		responsesMetricsManager:  responsesMetrics,
 		geminiMetricsManager:     geminiMetrics,
+		chatMetricsManager:       chatMetrics,
 		traceAffinity:            traceAffinity,
 		urlManager:               urlMgr,
 		messagesChannelLogStore:  metrics.NewChannelLogStore(),
 		responsesChannelLogStore: metrics.NewChannelLogStore(),
 		geminiChannelLogStore:    metrics.NewChannelLogStore(),
+		chatChannelLogStore:      metrics.NewChannelLogStore(),
 	}
 }
 
@@ -68,6 +74,8 @@ func (s *ChannelScheduler) getMetricsManager(kind ChannelKind) *metrics.MetricsM
 		return s.responsesMetricsManager
 	case ChannelKindGemini:
 		return s.geminiMetricsManager
+	case ChannelKindChat:
+		return s.chatMetricsManager
 	default:
 		return s.messagesMetricsManager
 	}
@@ -99,6 +107,8 @@ func (s *ChannelScheduler) SelectChannel(
 			return nil, fmt.Errorf("没有可用的活跃 Gemini 渠道")
 		case ChannelKindResponses:
 			return nil, fmt.Errorf("没有可用的活跃 Responses 渠道")
+		case ChannelKindChat:
+			return nil, fmt.Errorf("没有可用的活跃 Chat 渠道")
 		default:
 			return nil, fmt.Errorf("没有可用的活跃 Messages 渠道")
 		}
@@ -132,7 +142,8 @@ func (s *ChannelScheduler) SelectChannel(
 
 	// 1. 检查 Trace 亲和性（促销渠道失败时或无促销渠道时）
 	if userID != "" {
-		if preferredIdx, ok := s.traceAffinity.GetPreferredChannel(userID); ok {
+		compositeKey := string(kind) + ":" + userID
+		if preferredIdx, ok := s.traceAffinity.GetPreferredChannel(compositeKey); ok {
 			for _, ch := range activeChannels {
 				if ch.Index == preferredIdx && !failedChannels[preferredIdx] {
 					// 检查渠道状态：只有 active 状态才使用亲和性
@@ -282,6 +293,8 @@ func (s *ChannelScheduler) getActiveChannels(kind ChannelKind) []ChannelInfo {
 		upstreams = cfg.ResponsesUpstream
 	case ChannelKindGemini:
 		upstreams = cfg.GeminiUpstream
+	case ChannelKindChat:
+		upstreams = cfg.ChatUpstream
 	default:
 		upstreams = cfg.Upstream
 	}
@@ -329,6 +342,8 @@ func (s *ChannelScheduler) getUpstreamByIndex(index int, kind ChannelKind) *conf
 		upstreams = cfg.ResponsesUpstream
 	case ChannelKindGemini:
 		upstreams = cfg.GeminiUpstream
+	case ChannelKindChat:
+		upstreams = cfg.ChatUpstream
 	default:
 		upstreams = cfg.Upstream
 	}
@@ -366,17 +381,19 @@ func (s *ChannelScheduler) RecordRequestEnd(baseURL, apiKey string, kind Channel
 	s.getMetricsManager(kind).RecordRequestEnd(baseURL, apiKey)
 }
 
-// SetTraceAffinity 设置 Trace 亲和
-func (s *ChannelScheduler) SetTraceAffinity(userID string, channelIndex int) {
+// SetTraceAffinity 设置 Trace 亲和（按 kind 隔离）
+func (s *ChannelScheduler) SetTraceAffinity(userID string, channelIndex int, kind ChannelKind) {
 	if userID != "" {
-		s.traceAffinity.SetPreferredChannel(userID, channelIndex)
+		compositeKey := string(kind) + ":" + userID
+		s.traceAffinity.SetPreferredChannel(compositeKey, channelIndex)
 	}
 }
 
-// UpdateTraceAffinity 更新 Trace 亲和时间（续期）
-func (s *ChannelScheduler) UpdateTraceAffinity(userID string) {
+// UpdateTraceAffinity 更新 Trace 亲和时间（续期，按 kind 隔离）
+func (s *ChannelScheduler) UpdateTraceAffinity(userID string, kind ChannelKind) {
 	if userID != "" {
-		s.traceAffinity.UpdateLastUsed(userID)
+		compositeKey := string(kind) + ":" + userID
+		s.traceAffinity.UpdateLastUsed(compositeKey)
 	}
 }
 
@@ -395,6 +412,11 @@ func (s *ChannelScheduler) GetGeminiMetricsManager() *metrics.MetricsManager {
 	return s.geminiMetricsManager
 }
 
+// GetChatMetricsManager 获取 Chat 指标管理器
+func (s *ChannelScheduler) GetChatMetricsManager() *metrics.MetricsManager {
+	return s.chatMetricsManager
+}
+
 // GetTraceAffinityManager 获取 Trace 亲和性管理器
 func (s *ChannelScheduler) GetTraceAffinityManager() *session.TraceAffinityManager {
 	return s.traceAffinity
@@ -407,6 +429,8 @@ func (s *ChannelScheduler) GetChannelLogStore(kind ChannelKind) *metrics.Channel
 		return s.responsesChannelLogStore
 	case ChannelKindGemini:
 		return s.geminiChannelLogStore
+	case ChannelKindChat:
+		return s.chatChannelLogStore
 	default:
 		return s.messagesChannelLogStore
 	}
@@ -503,6 +527,8 @@ func (s *ChannelScheduler) collectUsedCombinations(kind ChannelKind) map[string]
 		upstreams = cfg.ResponsesUpstream
 	case ChannelKindGemini:
 		upstreams = cfg.GeminiUpstream
+	case ChannelKindChat:
+		upstreams = cfg.ChatUpstream
 	default:
 		upstreams = cfg.Upstream
 	}
@@ -536,6 +562,8 @@ func (s *ChannelScheduler) isUpstreamInConfig(upstream *config.UpstreamConfig, k
 		upstreams = cfg.ResponsesUpstream
 	case ChannelKindGemini:
 		upstreams = cfg.GeminiUpstream
+	case ChannelKindChat:
+		upstreams = cfg.ChatUpstream
 	default:
 		upstreams = cfg.Upstream
 	}
@@ -623,6 +651,8 @@ func kindSchedulerLogPrefix(kind ChannelKind) string {
 		return "Scheduler-Responses"
 	case ChannelKindGemini:
 		return "Scheduler-Gemini"
+	case ChannelKindChat:
+		return "Scheduler-Chat"
 	default:
 		return "Scheduler"
 	}
@@ -639,6 +669,8 @@ func urlManagerChannelKeyOrdinal(kind ChannelKind) int {
 		return 1
 	case ChannelKindGemini:
 		return 2
+	case ChannelKindChat:
+		return 3
 	default:
 		return 0
 	}

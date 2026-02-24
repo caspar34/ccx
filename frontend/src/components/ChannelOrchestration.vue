@@ -510,7 +510,7 @@ import ChannelLogsDialog from './ChannelLogsDialog.vue'
 const props = defineProps<{
   channels: Channel[]
   currentChannelIndex: number
-  channelType: 'messages' | 'responses' | 'gemini'
+  channelType: 'messages' | 'chat' | 'responses' | 'gemini'
   // 可选：从父组件传入的 metrics 和 stats（使用 dashboard 接口时）
   dashboardMetrics?: ChannelMetrics[]
   dashboardStats?: {
@@ -1154,11 +1154,13 @@ const refreshMetrics = async () => {
   isLoadingMetrics.value = true
   try {
     const [metricsData, statsData] = await Promise.all([
-      props.channelType === 'gemini'
-        ? api.getGeminiChannelMetrics()
-        : props.channelType === 'responses'
-          ? api.getResponsesChannelMetrics()
-          : api.getChannelMetrics(),
+      props.channelType === 'chat'
+        ? api.getChatChannelMetrics()
+        : props.channelType === 'gemini'
+          ? api.getGeminiChannelMetrics()
+          : props.channelType === 'responses'
+            ? api.getResponsesChannelMetrics()
+            : api.getChannelMetrics(),
       api.getSchedulerStats(props.channelType)
     ])
     metrics.value = metricsData
@@ -1181,7 +1183,9 @@ const saveOrder = async () => {
   isSavingOrder.value = true
   try {
     const order = activeChannels.value.map(ch => ch.index)
-    if (props.channelType === 'gemini') {
+    if (props.channelType === 'chat') {
+      await api.reorderChatChannels(order)
+    } else if (props.channelType === 'gemini') {
       await api.reorderGeminiChannels(order)
     } else if (props.channelType === 'responses') {
       await api.reorderResponsesChannels(order)
@@ -1225,7 +1229,9 @@ const moveChannelToBottom = async (channelIndex: number) => {
 // 设置渠道状态
 const setChannelStatus = async (channelId: number, status: ChannelStatus) => {
   try {
-    if (props.channelType === 'gemini') {
+    if (props.channelType === 'chat') {
+      await api.setChatChannelStatus(channelId, status)
+    } else if (props.channelType === 'gemini') {
       await api.setGeminiChannelStatus(channelId, status)
     } else if (props.channelType === 'responses') {
       await api.setResponsesChannelStatus(channelId, status)
@@ -1248,7 +1254,9 @@ const enableChannel = async (channelId: number) => {
 // 恢复渠道（重置指标并设为 active）
 const resumeChannel = async (channelId: number) => {
   try {
-    if (props.channelType === 'gemini') {
+    if (props.channelType === 'chat') {
+      await api.resumeChatChannel(channelId)
+    } else if (props.channelType === 'gemini') {
       await api.resumeGeminiChannel(channelId)
     } else if (props.channelType === 'responses') {
       await api.resumeResponsesChannel(channelId)
@@ -1268,7 +1276,9 @@ const setPromotion = async (channel: Channel) => {
 
     // 如果渠道是熔断状态，先恢复它
     if (channel.status === 'suspended') {
-      if (props.channelType === 'gemini') {
+      if (props.channelType === 'chat') {
+        await api.resumeChatChannel(channel.index)
+      } else if (props.channelType === 'gemini') {
         await api.resumeGeminiChannel(channel.index)
       } else if (props.channelType === 'responses') {
         await api.resumeResponsesChannel(channel.index)
@@ -1278,7 +1288,9 @@ const setPromotion = async (channel: Channel) => {
       await setChannelStatus(channel.index, 'active')
     }
 
-    if (props.channelType === 'gemini') {
+    if (props.channelType === 'chat') {
+      await api.setChatChannelPromotion(channel.index, PROMOTION_DURATION)
+    } else if (props.channelType === 'gemini') {
       await api.setGeminiChannelPromotion(channel.index, PROMOTION_DURATION)
     } else if (props.channelType === 'responses') {
       await api.setResponsesChannelPromotion(channel.index, PROMOTION_DURATION)

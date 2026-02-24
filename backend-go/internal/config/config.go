@@ -79,6 +79,10 @@ type Config struct {
 	GeminiUpstream    []UpstreamConfig `json:"geminiUpstream"`
 	GeminiLoadBalance string           `json:"geminiLoadBalance"`
 
+	// Chat Completions 接口专用配置（OpenAI /v1/chat/completions 兼容）
+	ChatUpstream    []UpstreamConfig `json:"chatUpstream,omitempty"`
+	ChatLoadBalance string           `json:"chatLoadBalance,omitempty"`
+
 	// Fuzzy 模式：启用时模糊处理错误，所有非 2xx 错误都尝试 failover
 	FuzzyModeEnabled bool `json:"fuzzyModeEnabled"`
 
@@ -103,6 +107,11 @@ type ConfigManager struct {
 	maxFailureCount int
 	stopChan        chan struct{} // 用于通知 goroutine 停止
 	closeOnce       sync.Once     // 确保 Close 只执行一次
+}
+
+// failedKeyCacheKey 构造 FailedKeysCache 的复合键（apiType:apiKey）
+func failedKeyCacheKey(apiType, apiKey string) string {
+	return apiType + ":" + apiKey
 }
 
 // ============== 核心共享方法 ==============
@@ -139,6 +148,14 @@ func (cm *ConfigManager) GetConfig() Config {
 		}
 	}
 
+	// 深拷贝 ChatUpstream slice
+	if len(cm.config.ChatUpstream) > 0 {
+		cloned.ChatUpstream = make([]UpstreamConfig, len(cm.config.ChatUpstream))
+		for i := range cm.config.ChatUpstream {
+			cloned.ChatUpstream[i] = *cm.config.ChatUpstream[i].Clone()
+		}
+	}
+
 	return cloned
 }
 
@@ -157,7 +174,7 @@ func (cm *ConfigManager) GetNextAPIKey(upstream *UpstreamConfig, failedKeys map[
 	// 筛选可用密钥：排除临时失败密钥和内存中的失败密钥
 	availableKeys := []string{}
 	for _, key := range upstream.APIKeys {
-		if !failedKeys[key] && !cm.isKeyFailed(key) {
+		if !failedKeys[key] && !cm.isKeyFailed(key, apiType) {
 			availableKeys = append(availableKeys, key)
 		}
 	}
@@ -170,7 +187,8 @@ func (cm *ConfigManager) GetNextAPIKey(upstream *UpstreamConfig, failedKeys map[
 		cm.mu.RLock()
 		for _, key := range upstream.APIKeys {
 			if !failedKeys[key] { // 排除本次请求已经尝试过的密钥
-				if failure, exists := cm.failedKeysCache[key]; exists {
+				cacheKey := failedKeyCacheKey(apiType, key)
+				if failure, exists := cm.failedKeysCache[cacheKey]; exists {
 					if failure.Timestamp.Before(oldestTime) {
 						oldestTime = failure.Timestamp
 						oldestFailedKey = key
@@ -203,22 +221,23 @@ func (cm *ConfigManager) GetNextAPIKey(upstream *UpstreamConfig, failedKeys map[
 }
 
 // MarkKeyAsFailed 标记密钥失败
-// apiType: 接口类型（Messages/Responses/Gemini），用于日志标签前缀
+// apiType: 接口类型（Messages/Responses/Gemini/Chat），用于日志标签前缀和缓存键隔离
 func (cm *ConfigManager) MarkKeyAsFailed(apiKey string, apiType string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	if failure, exists := cm.failedKeysCache[apiKey]; exists {
+	cacheKey := failedKeyCacheKey(apiType, apiKey)
+	if failure, exists := cm.failedKeysCache[cacheKey]; exists {
 		failure.FailureCount++
 		failure.Timestamp = time.Now()
 	} else {
-		cm.failedKeysCache[apiKey] = &FailedKey{
+		cm.failedKeysCache[cacheKey] = &FailedKey{
 			Timestamp:    time.Now(),
 			FailureCount: 1,
 		}
 	}
 
-	failure := cm.failedKeysCache[apiKey]
+	failure := cm.failedKeysCache[cacheKey]
 	recoveryTime := cm.keyRecoveryTime
 	if failure.FailureCount > cm.maxFailureCount {
 		recoveryTime = cm.keyRecoveryTime * 2
@@ -229,11 +248,12 @@ func (cm *ConfigManager) MarkKeyAsFailed(apiKey string, apiType string) {
 }
 
 // isKeyFailed 检查密钥是否失败
-func (cm *ConfigManager) isKeyFailed(apiKey string) bool {
+func (cm *ConfigManager) isKeyFailed(apiKey, apiType string) bool {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
-	failure, exists := cm.failedKeysCache[apiKey]
+	cacheKey := failedKeyCacheKey(apiType, apiKey)
+	failure, exists := cm.failedKeysCache[cacheKey]
 	if !exists {
 		return false
 	}
@@ -247,17 +267,18 @@ func (cm *ConfigManager) isKeyFailed(apiKey string) bool {
 }
 
 // IsKeyFailed 检查 Key 是否在冷却期（公开方法）
-func (cm *ConfigManager) IsKeyFailed(apiKey string) bool {
-	return cm.isKeyFailed(apiKey)
+func (cm *ConfigManager) IsKeyFailed(apiKey, apiType string) bool {
+	return cm.isKeyFailed(apiKey, apiType)
 }
 
 // clearFailedKeysForUpstream 清理指定渠道的所有失败 key 记录
 // 当渠道被删除时调用，避免内存泄漏和冷却状态残留
-// apiType: 接口类型（Messages/Responses/Gemini），用于日志标签前缀
+// apiType: 接口类型（Messages/Responses/Gemini/Chat），用于日志标签前缀和缓存键隔离
 func (cm *ConfigManager) clearFailedKeysForUpstream(upstream *UpstreamConfig, apiType string) {
 	for _, key := range upstream.APIKeys {
-		if _, exists := cm.failedKeysCache[key]; exists {
-			delete(cm.failedKeysCache, key)
+		cacheKey := failedKeyCacheKey(apiType, key)
+		if _, exists := cm.failedKeysCache[cacheKey]; exists {
+			delete(cm.failedKeysCache, cacheKey)
 			log.Printf("[%s-Key] 已清理被删除渠道 %s 的失败密钥记录: %s", apiType, upstream.Name, utils.MaskAPIKey(key))
 		}
 	}

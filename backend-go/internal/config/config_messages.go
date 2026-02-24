@@ -533,5 +533,25 @@ func (cm *ConfigManager) DeprioritizeAPIKey(apiKey string) error {
 		}
 	}
 
+	// 同样遍历 Chat 渠道
+	for upstreamIdx := range cm.config.ChatUpstream {
+		upstream := &cm.config.ChatUpstream[upstreamIdx]
+		index := -1
+		for i, key := range upstream.APIKeys {
+			if key == apiKey {
+				index = i
+				break
+			}
+		}
+
+		if index != -1 && index != len(upstream.APIKeys)-1 {
+			// 移动到末尾
+			upstream.APIKeys = append(upstream.APIKeys[:index], upstream.APIKeys[index+1:]...)
+			upstream.APIKeys = append(upstream.APIKeys, apiKey)
+			log.Printf("[Chat-Key] 已将API密钥移动到末尾以降低优先级: %s (Chat渠道: %s)", utils.MaskAPIKey(apiKey), upstream.Name)
+			return cm.saveConfigLocked(cm.config)
+		}
+	}
+
 	return nil
 }

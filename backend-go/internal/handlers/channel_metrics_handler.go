@@ -183,18 +183,20 @@ func ResumeChannel(sch *scheduler.ChannelScheduler, isResponses bool) gin.Handle
 // GetSchedulerStats 获取调度器统计信息
 func GetSchedulerStats(sch *scheduler.ChannelScheduler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 获取 isResponses 参数
-		isResponses := strings.ToLower(c.Query("type")) == "responses"
-		kind := scheduler.ChannelKindMessages
-		if isResponses {
-			kind = scheduler.ChannelKindResponses
-		}
+		queryType := strings.ToLower(c.Query("type"))
 
-		// 根据类型选择对应的指标管理器
+		var kind scheduler.ChannelKind
 		var metricsManager *metrics.MetricsManager
-		if isResponses {
+
+		switch queryType {
+		case "responses":
+			kind = scheduler.ChannelKindResponses
 			metricsManager = sch.GetResponsesMetricsManager()
-		} else {
+		case "chat":
+			kind = scheduler.ChannelKindChat
+			metricsManager = sch.GetChatMetricsManager()
+		default:
+			kind = scheduler.ChannelKindMessages
 			metricsManager = sch.GetMessagesMetricsManager()
 		}
 
@@ -890,5 +892,139 @@ func GetGeminiChannelMetrics(metricsManager *metrics.MetricsManager, cfgManager 
 		}
 
 		c.JSON(200, result)
+	}
+}
+
+// GetChatChannelMetrics 获取 Chat 渠道指标
+func GetChatChannelMetrics(metricsManager *metrics.MetricsManager, cfgManager *config.ConfigManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cfg := cfgManager.GetConfig()
+		result := make([]gin.H, 0, len(cfg.ChatUpstream))
+		for i, upstream := range cfg.ChatUpstream {
+			resp := metricsManager.ToResponseMultiURL(i, upstream.GetAllBaseURLs(), upstream.APIKeys, 0, upstream.HistoricalAPIKeys)
+			item := gin.H{
+				"channelIndex":        i,
+				"channelName":         upstream.Name,
+				"requestCount":        resp.RequestCount,
+				"successCount":        resp.SuccessCount,
+				"failureCount":        resp.FailureCount,
+				"successRate":         resp.SuccessRate,
+				"errorRate":           resp.ErrorRate,
+				"consecutiveFailures": resp.ConsecutiveFailures,
+				"latency":             resp.Latency,
+				"keyMetrics":          resp.KeyMetrics,
+				"timeWindows":         resp.TimeWindows,
+			}
+			if resp.LastSuccessAt != nil {
+				item["lastSuccessAt"] = *resp.LastSuccessAt
+			}
+			if resp.LastFailureAt != nil {
+				item["lastFailureAt"] = *resp.LastFailureAt
+			}
+			if resp.CircuitBrokenAt != nil {
+				item["circuitBrokenAt"] = *resp.CircuitBrokenAt
+			}
+			result = append(result, item)
+		}
+		c.JSON(200, result)
+	}
+}
+
+// GetChatChannelMetricsHistory 获取 Chat 渠道指标历史数据
+func GetChatChannelMetricsHistory(metricsManager *metrics.MetricsManager, cfgManager *config.ConfigManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		duration, interval := parseHistoryDuration(c)
+		cfg := cfgManager.GetConfig()
+		result := make([]MetricsHistoryResponse, 0, len(cfg.ChatUpstream))
+		for i, upstream := range cfg.ChatUpstream {
+			dataPoints := metricsManager.GetHistoricalStatsMultiURL(upstream.GetAllBaseURLs(), upstream.APIKeys, duration, interval)
+			result = append(result, MetricsHistoryResponse{ChannelIndex: i, ChannelName: upstream.Name, DataPoints: dataPoints})
+		}
+		c.JSON(200, result)
+	}
+}
+
+// GetChatChannelKeyMetricsHistory 获取 Chat 渠道下各 Key 的历史数据
+func GetChatChannelKeyMetricsHistory(metricsManager *metrics.MetricsManager, cfgManager *config.ConfigManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		duration, interval := parseKeyHistoryDuration(c)
+		channelID, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid channel ID"})
+			return
+		}
+		cfg := cfgManager.GetConfig()
+		if channelID < 0 || channelID >= len(cfg.ChatUpstream) {
+			c.JSON(400, gin.H{"error": "Channel not found"})
+			return
+		}
+		upstream := cfg.ChatUpstream[channelID]
+		allKeyInfos := metricsManager.GetChannelKeyUsageInfoMultiURL(upstream.GetAllBaseURLs(), upstream.APIKeys)
+		displayKeys := metrics.SelectTopKeys(allKeyInfos, 10)
+		result := ChannelKeyMetricsHistoryResponse{ChannelIndex: channelID, ChannelName: upstream.Name, Keys: make([]KeyMetricsHistoryResult, 0, len(displayKeys))}
+		for i, keyInfo := range displayKeys {
+			dataPoints := metricsManager.GetKeyHistoricalStatsMultiURL(upstream.GetAllBaseURLs(), keyInfo.APIKey, duration, interval)
+			result.Keys = append(result.Keys, KeyMetricsHistoryResult{KeyMask: truncateKeyMask(keyInfo.KeyMask, 8), Color: keyColors[i%len(keyColors)], DataPoints: dataPoints})
+		}
+		c.JSON(200, result)
+	}
+}
+
+// ResumeChannelWithKind 恢复指定类型的熔断渠道
+func ResumeChannelWithKind(sch *scheduler.ChannelScheduler, kind scheduler.ChannelKind) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid channel ID"})
+			return
+		}
+		sch.ResetChannelMetrics(id, kind)
+		c.JSON(200, gin.H{"success": true, "message": "渠道已恢复，熔断状态已重置（历史统计保留）"})
+	}
+}
+
+// parseHistoryDuration 解析历史数据查询参数
+func parseHistoryDuration(c *gin.Context) (time.Duration, time.Duration) {
+	durationStr := c.DefaultQuery("duration", "24h")
+	duration, _ := time.ParseDuration(durationStr)
+	if duration <= 0 || duration > 24*time.Hour {
+		duration = 24 * time.Hour
+	}
+	return duration, selectIntervalForDuration(c.Query("interval"), duration)
+}
+
+// parseKeyHistoryDuration 解析 Key 历史数据查询参数（支持 today）
+func parseKeyHistoryDuration(c *gin.Context) (time.Duration, time.Duration) {
+	durationStr := c.DefaultQuery("duration", "6h")
+	var duration time.Duration
+	if durationStr == "today" {
+		duration = metrics.CalculateTodayDuration()
+		if duration < time.Minute {
+			duration = time.Minute
+		}
+	} else {
+		duration, _ = time.ParseDuration(durationStr)
+	}
+	if duration <= 0 || duration > 24*time.Hour {
+		duration = 24 * time.Hour
+	}
+	return duration, selectIntervalForDuration(c.Query("interval"), duration)
+}
+
+// selectIntervalForDuration 解析或自动选择 interval
+func selectIntervalForDuration(intervalStr string, duration time.Duration) time.Duration {
+	if intervalStr != "" {
+		interval, err := time.ParseDuration(intervalStr)
+		if err == nil && interval >= time.Minute {
+			return interval
+		}
+	}
+	switch {
+	case duration <= time.Hour:
+		return time.Minute
+	case duration <= 6*time.Hour:
+		return 5 * time.Minute
+	default:
+		return 15 * time.Minute
 	}
 }

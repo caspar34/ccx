@@ -156,7 +156,7 @@ func handleMultiChannelCompact(
 			if successKey != "" {
 				channelScheduler.RecordSuccessWithUsage(upstream.BaseURL, successKey, nil, scheduler.ChannelKindResponses)
 				// 只有真正成功的请求才设置 Trace 亲和
-				channelScheduler.SetTraceAffinity(userID, channelIndex)
+				channelScheduler.SetTraceAffinity(userID, channelIndex, scheduler.ChannelKindResponses)
 			}
 			return
 		}

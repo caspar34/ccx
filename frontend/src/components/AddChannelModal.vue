@@ -99,7 +99,7 @@
                   <div class="flex-grow-1">
                     <div class="text-body-2 font-weight-medium">渠道类型</div>
                     <div class="text-caption text-medium-emphasis">
-                      {{ props.channelType === 'gemini' ? 'Gemini' : props.channelType === 'responses' ? 'Responses (Codex)' : 'Claude (Messages)' }} -
+                      {{ props.channelType === 'chat' ? 'OpenAI Chat' : props.channelType === 'gemini' ? 'Gemini' : props.channelType === 'responses' ? 'Responses (Codex)' : 'Claude (Messages)' }} -
                       {{ getDefaultServiceType() }}
                     </div>
                   </div>
@@ -681,7 +681,7 @@ import {
 interface Props {
   show: boolean
   channel?: Channel | null
-  channelType?: 'messages' | 'responses' | 'gemini'
+  channelType?: 'messages' | 'chat' | 'responses' | 'gemini'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -751,6 +751,9 @@ const parseQuickInput = () => {
 
 // 获取默认服务类型
 const getDefaultServiceType = (): string => {
+  if (props.channelType === 'chat') {
+    return 'OpenAI'
+  }
   if (props.channelType === 'gemini') {
     return 'Gemini'
   }
@@ -762,6 +765,9 @@ const getDefaultServiceType = (): string => {
 
 // 获取默认服务类型值
 const getDefaultServiceTypeValue = (): 'openai' | 'gemini' | 'claude' | 'responses' => {
+  if (props.channelType === 'chat') {
+    return 'openai'
+  }
   if (props.channelType === 'gemini') {
     return 'gemini'
   }
@@ -773,6 +779,9 @@ const getDefaultServiceTypeValue = (): 'openai' | 'gemini' | 'claude' | 'respons
 
 // 获取默认 Base URL
 const _getDefaultBaseUrl = (): string => {
+  if (props.channelType === 'chat') {
+    return 'https://api.openai.com/v1'
+  }
   if (props.channelType === 'gemini') {
     return 'https://generativelanguage.googleapis.com'
   }
@@ -1003,6 +1012,14 @@ const handleQuickSubmit = () => {
 
 // 服务类型选项 - 根据渠道类型动态显示
 const serviceTypeOptions = computed(() => {
+  if (props.channelType === 'chat') {
+    return [
+      { title: 'OpenAI', value: 'openai' },
+      { title: 'Claude', value: 'claude' },
+      { title: 'Gemini', value: 'gemini' },
+      { title: 'Responses (原生接口)', value: 'responses' }
+    ]
+  }
   if (props.channelType === 'gemini') {
     return [
       { title: 'Gemini', value: 'gemini' },
@@ -1027,6 +1044,19 @@ const serviceTypeOptions = computed(() => {
 
 // 全部源模型选项 - 根据渠道类型动态显示
 const allSourceModelOptions = computed(() => {
+  if (props.channelType === 'chat') {
+    // OpenAI Chat Completions 常用模型
+    return [
+      { title: 'gpt-4o', value: 'gpt-4o' },
+      { title: 'gpt-4o-mini', value: 'gpt-4o-mini' },
+      { title: 'gpt-4.1', value: 'gpt-4.1' },
+      { title: 'gpt-4.1-mini', value: 'gpt-4.1-mini' },
+      { title: 'gpt-4.1-nano', value: 'gpt-4.1-nano' },
+      { title: 'o3', value: 'o3' },
+      { title: 'o3-mini', value: 'o3-mini' },
+      { title: 'o4-mini', value: 'o4-mini' }
+    ]
+  }
   if (props.channelType === 'gemini') {
     // Gemini API 常用模型别名
     return [
@@ -1073,6 +1103,9 @@ const sourceModelOptions = computed(() => {
 
 // 模型重定向的示例文本 - 根据渠道类型动态显示
 const modelMappingHint = computed(() => {
+  if (props.channelType === 'chat') {
+    return '配置模型名称映射，将请求中的模型名重定向到目标模型。例如：将 "gpt-4o" 重定向到 "gpt-4.1"'
+  }
   if (props.channelType === 'gemini') {
     return '配置模型名称映射，将请求中的模型名重定向到目标模型。例如：将 "gemini-pro" 重定向到 "gemini-2.0-flash"'
   }
@@ -1084,6 +1117,9 @@ const modelMappingHint = computed(() => {
 })
 
 const targetModelPlaceholder = computed(() => {
+  if (props.channelType === 'chat') {
+    return '例如：gpt-4.1'
+  }
   if (props.channelType === 'gemini') {
     return '例如：gemini-2.0-flash'
   }

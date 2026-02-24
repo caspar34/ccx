@@ -574,7 +574,7 @@ class ApiService {
   }
 
   // 获取调度器统计信息
-  async getSchedulerStats(type?: 'messages' | 'responses' | 'gemini'): Promise<{
+  async getSchedulerStats(type?: 'messages' | 'responses' | 'gemini' | 'chat'): Promise<{
     multiChannelMode: boolean
     activeChannelCount: number
     traceAffinityCount: number
@@ -593,15 +593,18 @@ class ApiService {
         windowSize: 0
       }
     }
-    const query = type === 'responses' ? '?type=responses' : ''
+    const query = type === 'responses' ? '?type=responses' : type === 'chat' ? '?type=chat' : ''
     return this.request(`/messages/channels/scheduler/stats${query}`)
   }
 
   // 获取渠道仪表盘数据（合并 channels + metrics + stats）
-  async getChannelDashboard(type: 'messages' | 'responses' | 'gemini' = 'messages'): Promise<ChannelDashboardResponse> {
+  async getChannelDashboard(type: 'messages' | 'responses' | 'gemini' | 'chat' = 'messages'): Promise<ChannelDashboardResponse> {
     // Gemini 使用降级实现：组合 getChannels + getMetrics
     if (type === 'gemini') {
       return this.getGeminiChannelDashboard()
+    }
+    if (type === 'chat') {
+      return this.getChatChannelDashboard()
     }
     const query = type === 'responses' ? '?type=responses' : ''
     return this.request(`/messages/channels/dashboard${query}`)
@@ -722,16 +725,134 @@ class ApiService {
   }
   // ============== 模型统计 API ==============
 
-  async getModelStatsHistory(type: 'messages' | 'responses' | 'gemini', duration: '1h' | '6h' | '24h' | 'today' = '24h'): Promise<ModelStatsHistoryResponse> {
+  async getModelStatsHistory(type: 'messages' | 'responses' | 'gemini' | 'chat', duration: '1h' | '6h' | '24h' | 'today' = '24h'): Promise<ModelStatsHistoryResponse> {
     return this.request(`/${type}/models/stats/history?duration=${duration}`)
   }
 
   // ============== 渠道日志 API ==============
 
-  async getChannelLogs(type: 'messages' | 'responses' | 'gemini', channelId: number): Promise<ChannelLogsResponse> {
+  async getChannelLogs(type: 'messages' | 'responses' | 'gemini' | 'chat', channelId: number): Promise<ChannelLogsResponse> {
     return this.request(`/${type}/channels/${channelId}/logs`)
   }
 
+
+  // ============== Chat 渠道管理 API ==============
+
+  async getChatChannels(): Promise<ChannelsResponse> {
+    return this.request('/chat/channels')
+  }
+
+  async addChatChannel(channel: Omit<Channel, 'index' | 'latency' | 'status'>): Promise<void> {
+    await this.request('/chat/channels', {
+      method: 'POST',
+      body: JSON.stringify(channel)
+    })
+  }
+
+  async updateChatChannel(id: number, channel: Partial<Channel>): Promise<void> {
+    await this.request(`/chat/channels/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(channel)
+    })
+  }
+
+  async deleteChatChannel(id: number): Promise<void> {
+    await this.request(`/chat/channels/${id}`, {
+      method: 'DELETE'
+    })
+  }
+
+  async addChatApiKey(channelId: number, apiKey: string): Promise<void> {
+    await this.request(`/chat/channels/${channelId}/keys`, {
+      method: 'POST',
+      body: JSON.stringify({ apiKey })
+    })
+  }
+
+  async removeChatApiKey(channelId: number, apiKey: string): Promise<void> {
+    await this.request(`/chat/channels/${channelId}/keys/${encodeURIComponent(apiKey)}`, {
+      method: 'DELETE'
+    })
+  }
+
+  async moveChatApiKeyToTop(channelId: number, apiKey: string): Promise<void> {
+    await this.request(`/chat/channels/${channelId}/keys/${encodeURIComponent(apiKey)}/top`, {
+      method: 'POST'
+    })
+  }
+
+  async moveChatApiKeyToBottom(channelId: number, apiKey: string): Promise<void> {
+    await this.request(`/chat/channels/${channelId}/keys/${encodeURIComponent(apiKey)}/bottom`, {
+      method: 'POST'
+    })
+  }
+
+  // ============== Chat 多渠道调度 API ==============
+
+  async reorderChatChannels(order: number[]): Promise<void> {
+    await this.request('/chat/channels/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ order })
+    })
+  }
+
+  async setChatChannelStatus(channelId: number, status: ChannelStatus): Promise<void> {
+    await this.request(`/chat/channels/${channelId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    })
+  }
+
+  async resumeChatChannel(channelId: number): Promise<void> {
+    await this.request(`/chat/channels/${channelId}/resume`, {
+      method: 'POST'
+    })
+  }
+
+  async getChatChannelMetrics(): Promise<ChannelMetrics[]> {
+    return this.request('/chat/channels/metrics')
+  }
+
+  async setChatChannelPromotion(channelId: number, durationSeconds: number): Promise<void> {
+    await this.request(`/chat/channels/${channelId}/promotion`, {
+      method: 'POST',
+      body: JSON.stringify({ duration: durationSeconds })
+    })
+  }
+
+  async updateChatLoadBalance(strategy: string): Promise<void> {
+    await this.request('/chat/loadbalance', {
+      method: 'PUT',
+      body: JSON.stringify({ strategy })
+    })
+  }
+
+  // ============== Chat 历史指标 API ==============
+
+  async getChatChannelMetricsHistory(duration: '1h' | '6h' | '24h' = '24h'): Promise<MetricsHistoryResponse[]> {
+    return this.request(`/chat/channels/metrics/history?duration=${duration}`)
+  }
+
+  async getChatChannelKeyMetricsHistory(channelId: number, duration: '1h' | '6h' | '24h' | 'today' = '6h'): Promise<ChannelKeyMetricsHistoryResponse> {
+    return this.request(`/chat/channels/${channelId}/keys/metrics/history?duration=${duration}`)
+  }
+
+  async getChatGlobalStats(duration: '1h' | '6h' | '24h' | 'today' = '24h'): Promise<GlobalStatsHistoryResponse> {
+    return this.request(`/chat/global/stats/history?duration=${duration}`)
+  }
+
+  async pingChatChannel(id: number): Promise<PingResult> {
+    return this.request(`/chat/ping/${id}`)
+  }
+
+  async pingAllChatChannels(): Promise<Array<{ id: number; name: string; latency: number; status: string }>> {
+    return this.request('/chat/ping')
+  }
+
+  // Chat Dashboard（使用后端统一接口）
+  async getChatChannelDashboard(): Promise<ChannelDashboardResponse> {
+    return this.request('/chat/channels/dashboard')
+  }
 
   // ============== Gemini 渠道管理 API ==============
 

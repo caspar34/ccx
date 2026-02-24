@@ -75,6 +75,10 @@
             Claude
           </router-link>
           <span class="api-type-text separator">/</span>
+          <router-link to="/channels/chat" class="api-type-text" :class="{ active: channelStore.activeTab === 'chat' }">
+            OpenAI Chat
+          </router-link>
+          <span class="api-type-text separator">/</span>
           <router-link to="/channels/responses" class="api-type-text" :class="{ active: channelStore.activeTab === 'responses' }">
             Codex
           </router-link>
@@ -158,7 +162,7 @@
             <div class="d-flex align-center">
               <v-icon size="20" class="mr-2">mdi-chart-areaspline</v-icon>
               <span class="text-subtitle-1 font-weight-bold">
-                {{ channelStore.activeTab === 'messages' ? 'Claude Messages' : (channelStore.activeTab === 'responses' ? 'Codex Responses' : 'Gemini') }} 流量统计
+                {{ channelStore.activeTab === 'messages' ? 'Claude Messages' : channelStore.activeTab === 'chat' ? 'OpenAI Chat' : (channelStore.activeTab === 'responses' ? 'Codex Responses' : 'Gemini') }} 流量统计
               </span>
             </div>
             <v-btn icon size="small" variant="text">
@@ -509,7 +513,9 @@ const addApiKey = async () => {
   if (!dialogStore.newApiKey.trim()) return
 
   try {
-    if (channelStore.activeTab === 'gemini') {
+    if (channelStore.activeTab === 'chat') {
+      await api.addChatApiKey(dialogStore.selectedChannelForKey, dialogStore.newApiKey.trim())
+    } else if (channelStore.activeTab === 'gemini') {
       await api.addGeminiApiKey(dialogStore.selectedChannelForKey, dialogStore.newApiKey.trim())
     } else if (channelStore.activeTab === 'responses') {
       await api.addResponsesApiKey(dialogStore.selectedChannelForKey, dialogStore.newApiKey.trim())
@@ -528,7 +534,9 @@ const _removeApiKey = async (channelId: number, apiKey: string) => {
   if (!confirm('确定要删除这个API密钥吗？')) return
 
   try {
-    if (channelStore.activeTab === 'gemini') {
+    if (channelStore.activeTab === 'chat') {
+      await api.removeChatApiKey(channelId, apiKey)
+    } else if (channelStore.activeTab === 'gemini') {
       await api.removeGeminiApiKey(channelId, apiKey)
     } else if (channelStore.activeTab === 'responses') {
       await api.removeResponsesApiKey(channelId, apiKey)

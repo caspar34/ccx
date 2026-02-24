@@ -68,7 +68,7 @@ import { api, type ModelStatsHistoryResponse } from '../services/api'
 const apexchart = VueApexCharts
 
 const props = defineProps<{
-  apiType: 'messages' | 'responses' | 'gemini'
+  apiType: 'messages' | 'chat' | 'responses' | 'gemini'
 }>()
 
 type Duration = '1h' | '6h' | '24h' | 'today'

@@ -13,6 +13,7 @@ import (
 
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/handlers"
+	"github.com/BenedictKing/ccx/internal/handlers/chat"
 	"github.com/BenedictKing/ccx/internal/handlers/gemini"
 	"github.com/BenedictKing/ccx/internal/handlers/messages"
 	"github.com/BenedictKing/ccx/internal/handlers/responses"
@@ -85,8 +86,8 @@ func main() {
 		log.Printf("[Metrics-Init] 指标持久化已禁用，使用纯内存模式")
 	}
 
-	// 初始化多渠道调度器（Messages、Responses 和 Gemini 使用独立的指标管理器）
-	var messagesMetricsManager, responsesMetricsManager, geminiMetricsManager *metrics.MetricsManager
+	// 初始化多渠道调度器（Messages、Responses、Gemini 和 Chat 使用独立的指标管理器）
+	var messagesMetricsManager, responsesMetricsManager, geminiMetricsManager, chatMetricsManager *metrics.MetricsManager
 	if metricsStore != nil {
 		messagesMetricsManager = metrics.NewMetricsManagerWithPersistence(
 			envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold, metricsStore, "messages")
@@ -94,10 +95,13 @@ func main() {
 			envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold, metricsStore, "responses")
 		geminiMetricsManager = metrics.NewMetricsManagerWithPersistence(
 			envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold, metricsStore, "gemini")
+		chatMetricsManager = metrics.NewMetricsManagerWithPersistence(
+			envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold, metricsStore, "chat")
 	} else {
 		messagesMetricsManager = metrics.NewMetricsManagerWithConfig(envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold)
 		responsesMetricsManager = metrics.NewMetricsManagerWithConfig(envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold)
 		geminiMetricsManager = metrics.NewMetricsManagerWithConfig(envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold)
+		chatMetricsManager = metrics.NewMetricsManagerWithConfig(envCfg.MetricsWindowSize, envCfg.MetricsFailureThreshold)
 	}
 	traceAffinityManager := session.NewTraceAffinityManager()
 
@@ -105,7 +109,7 @@ func main() {
 	urlManager := warmup.NewURLManager(30*time.Second, 3) // 30秒冷却期，连续3次失败后移到末尾
 	log.Printf("[URLManager-Init] URL管理器已初始化 (冷却期: 30秒, 最大连续失败: 3)")
 
-	channelScheduler := scheduler.NewChannelScheduler(cfgManager, messagesMetricsManager, responsesMetricsManager, geminiMetricsManager, traceAffinityManager, urlManager)
+	channelScheduler := scheduler.NewChannelScheduler(cfgManager, messagesMetricsManager, responsesMetricsManager, geminiMetricsManager, chatMetricsManager, traceAffinityManager, urlManager)
 	log.Printf("[Scheduler-Init] 多渠道调度器已初始化 (失败率阈值: %.0f%%, 滑动窗口: %d)",
 		messagesMetricsManager.GetFailureThreshold()*100, messagesMetricsManager.GetWindowSize())
 
@@ -212,6 +216,33 @@ func main() {
 		apiGroup.GET("/gemini/models/stats/history", handlers.GetModelStatsHistory(geminiMetricsManager))
 		apiGroup.GET("/gemini/channels/:id/logs", handlers.GetChannelLogs(channelScheduler.GetChannelLogStore(scheduler.ChannelKindGemini)))
 
+		// Chat 渠道管理
+		apiGroup.GET("/chat/channels", chat.GetUpstreams(cfgManager))
+		apiGroup.POST("/chat/channels", chat.AddUpstream(cfgManager))
+		apiGroup.PUT("/chat/channels/:id", chat.UpdateUpstream(cfgManager, channelScheduler))
+		apiGroup.DELETE("/chat/channels/:id", chat.DeleteUpstream(cfgManager, channelScheduler))
+		apiGroup.POST("/chat/channels/:id/keys", chat.AddApiKey(cfgManager))
+		apiGroup.DELETE("/chat/channels/:id/keys/:apiKey", chat.DeleteApiKey(cfgManager))
+		apiGroup.POST("/chat/channels/:id/keys/:apiKey/top", chat.MoveApiKeyToTop(cfgManager))
+		apiGroup.POST("/chat/channels/:id/keys/:apiKey/bottom", chat.MoveApiKeyToBottom(cfgManager))
+
+		// Chat 多渠道调度 API
+		apiGroup.POST("/chat/channels/reorder", chat.ReorderChannels(cfgManager))
+		apiGroup.PATCH("/chat/channels/:id/status", chat.SetChannelStatus(cfgManager))
+		apiGroup.POST("/chat/channels/:id/resume", handlers.ResumeChannelWithKind(channelScheduler, scheduler.ChannelKindChat))
+		apiGroup.POST("/chat/channels/:id/promotion", chat.SetChannelPromotion(cfgManager))
+		apiGroup.PUT("/chat/loadbalance", chat.UpdateLoadBalance(cfgManager))
+		apiGroup.GET("/chat/channels/dashboard", chat.GetDashboard(cfgManager, channelScheduler))
+		apiGroup.GET("/chat/channels/metrics", handlers.GetChatChannelMetrics(chatMetricsManager, cfgManager))
+		apiGroup.GET("/chat/channels/metrics/history", handlers.GetChatChannelMetricsHistory(chatMetricsManager, cfgManager))
+		apiGroup.GET("/chat/channels/:id/keys/metrics/history", handlers.GetChatChannelKeyMetricsHistory(chatMetricsManager, cfgManager))
+		apiGroup.GET("/chat/global/stats/history", handlers.GetGlobalStatsHistory(chatMetricsManager))
+		apiGroup.GET("/chat/ping/:id", chat.PingChannel(cfgManager))
+		apiGroup.GET("/chat/ping", chat.PingAllChannels(cfgManager))
+		apiGroup.GET("/chat/models/stats/history", handlers.GetModelStatsHistory(chatMetricsManager))
+		apiGroup.GET("/chat/channels/:id/logs", handlers.GetChannelLogs(channelScheduler.GetChannelLogStore(scheduler.ChannelKindChat)))
+		apiGroup.GET("/chat/channels/scheduler/stats", handlers.GetSchedulerStats(channelScheduler))
+
 		// Fuzzy 模式设置
 		apiGroup.GET("/settings/fuzzy-mode", handlers.GetFuzzyMode(cfgManager))
 		apiGroup.PUT("/settings/fuzzy-mode", handlers.SetFuzzyMode(cfgManager))
@@ -237,6 +268,9 @@ func main() {
 	// 使用通配符捕获 model:action 格式，如 gemini-pro:generateContent
 	// 路径格式：/v1beta/models/{model}:generateContent (Gemini 原生格式)
 	r.POST("/v1beta/models/*modelAction", gemini.Handler(envCfg, cfgManager, channelScheduler))
+
+	// 代理端点 - Chat Completions API (OpenAI 兼容)
+	r.POST("/v1/chat/completions", chat.Handler(envCfg, cfgManager, channelScheduler))
 
 	// 静态文件服务 (嵌入的前端)
 	if envCfg.EnableWebUI {
@@ -274,6 +308,7 @@ func main() {
 	fmt.Printf("[Server-Info] Codex Responses: POST /v1/responses\n")
 	fmt.Printf("[Server-Info] Gemini API: POST /v1beta/models/{model}:generateContent\n")
 	fmt.Printf("[Server-Info] Gemini API: POST /v1beta/models/{model}:streamGenerateContent\n")
+	fmt.Printf("[Server-Info] Chat Completions: POST /v1/chat/completions\n")
 	fmt.Printf("[Server-Info] 健康检查: GET /health\n")
 	fmt.Printf("[Server-Info] 环境: %s\n", envCfg.Env)
 	// 检查是否使用默认密码，给予提示

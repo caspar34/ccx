@@ -68,7 +68,7 @@ const props = defineProps<{
   modelValue: boolean
   channelIndex: number
   channelName: string
-  channelType: 'messages' | 'responses' | 'gemini'
+  channelType: 'messages' | 'chat' | 'responses' | 'gemini'
 }>()
 
 defineEmits<{
@@ -94,6 +94,7 @@ const statusColor = (code: number): string => {
 const interfaceTypeColor = (type: string): string => {
   switch (type.toLowerCase()) {
     case 'messages': return 'primary'
+    case 'chat': return 'success'
     case 'responses': return 'secondary'
     case 'gemini': return 'info'
     default: return 'default'
