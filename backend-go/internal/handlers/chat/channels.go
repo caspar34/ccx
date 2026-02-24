@@ -11,6 +11,7 @@ import (
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/httpclient"
 	"github.com/BenedictKing/ccx/internal/scheduler"
+	"github.com/BenedictKing/ccx/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -342,13 +343,27 @@ func PingChannel(cfgManager *config.ConfigManager) gin.HandlerFunc {
 			return
 		}
 
-		// OpenAI 风格连通性测试
 		client := httpclient.GetManager().GetStandardClient(10*time.Second, upstream.InsecureSkipVerify, upstream.ProxyURL)
-		testURL := fmt.Sprintf("%s/v1/models", strings.TrimRight(baseURL, "/"))
 
-		req, _ := http.NewRequest("GET", testURL, nil)
-		if len(upstream.APIKeys) > 0 {
-			req.Header.Set("Authorization", "Bearer "+upstream.APIKeys[0])
+		// 根据 serviceType 选择不同的健康检查端点
+		var testURL string
+		var req *http.Request
+		switch upstream.ServiceType {
+		case "claude":
+			// Claude API 没有 /v1/models，使用 /v1/messages 的 OPTIONS 请求
+			testURL = fmt.Sprintf("%s/v1/messages", strings.TrimRight(baseURL, "/"))
+			req, _ = http.NewRequest("OPTIONS", testURL, nil)
+			if len(upstream.APIKeys) > 0 {
+				utils.SetAuthenticationHeader(req.Header, upstream.APIKeys[0])
+				req.Header.Set("anthropic-version", "2023-06-01")
+			}
+		default:
+			// OpenAI / Gemini / Responses 等使用 /v1/models
+			testURL = fmt.Sprintf("%s/v1/models", strings.TrimRight(baseURL, "/"))
+			req, _ = http.NewRequest("GET", testURL, nil)
+			if len(upstream.APIKeys) > 0 {
+				utils.SetAuthenticationHeader(req.Header, upstream.APIKeys[0])
+			}
 		}
 
 		start := time.Now()
@@ -391,13 +406,25 @@ func PingAllChannels(cfgManager *config.ConfigManager) gin.HandlerFunc {
 				continue
 			}
 
-			// 每个渠道使用各自的代理配置
 			client := httpclient.GetManager().GetStandardClient(10*time.Second, upstream.InsecureSkipVerify, upstream.ProxyURL)
 
-			testURL := fmt.Sprintf("%s/v1/models", strings.TrimRight(baseURL, "/"))
-			req, _ := http.NewRequest("GET", testURL, nil)
-			if len(upstream.APIKeys) > 0 {
-				req.Header.Set("Authorization", "Bearer "+upstream.APIKeys[0])
+			// 根据 serviceType 选择不同的健康检查端点
+			var testURL string
+			var req *http.Request
+			switch upstream.ServiceType {
+			case "claude":
+				testURL = fmt.Sprintf("%s/v1/messages", strings.TrimRight(baseURL, "/"))
+				req, _ = http.NewRequest("OPTIONS", testURL, nil)
+				if len(upstream.APIKeys) > 0 {
+					utils.SetAuthenticationHeader(req.Header, upstream.APIKeys[0])
+					req.Header.Set("anthropic-version", "2023-06-01")
+				}
+			default:
+				testURL = fmt.Sprintf("%s/v1/models", strings.TrimRight(baseURL, "/"))
+				req, _ = http.NewRequest("GET", testURL, nil)
+				if len(upstream.APIKeys) > 0 {
+					utils.SetAuthenticationHeader(req.Header, upstream.APIKeys[0])
+				}
 			}
 
 			start := time.Now()

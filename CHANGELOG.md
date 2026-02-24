@@ -7,6 +7,11 @@
   - 前端：渠道编辑表单新增代理 URL 输入框，`Channel` 接口支持 `proxyUrl` 字段
   - Ping 适配：Messages 和 Gemini 渠道连通性测试均通过渠道代理发送
 
+### 修复
+
+- **Chat 渠道 Ping 对 Claude serviceType 的支持** - Claude API 没有 `/v1/models` 端点，改用 `OPTIONS /v1/messages` 进行健康检查
+- **Chat Claude 响应 finish_reason 映射** - 正确映射 Claude `stop_reason` 到 OpenAI `finish_reason`（`max_tokens`→`length`, `tool_use`→`tool_calls`）
+
 ### 文档
 
 - **新增 OpenAI Chat Completions 端点设计文档** (`docs/chat-completions-design.md`) - 详细设计第四类用户侧 API (`POST /v1/chat/completions`)，涵盖后端 Config/CRUD/Handler/Scheduler/Metrics 扩展、协议转换器（OpenAI Chat ↔ Claude/Gemini）、FailedKeysCache 和 TraceAffinity 按 apiType 隔离、前端 Chat Tab 集成等完整方案

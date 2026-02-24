@@ -407,12 +407,65 @@ func convertChatToClaudeRequest(bodyBytes []byte, model string, isStream bool) (
 					"content": content,
 				})
 			case "assistant":
+				// 检查是否包含 tool_calls（OpenAI → Claude tool_use）
+				if toolCalls, ok := m["tool_calls"].([]interface{}); ok && len(toolCalls) > 0 {
+					var contentBlocks []map[string]interface{}
+					// 先添加文本内容（如有）
+					if text, ok := content.(string); ok && text != "" {
+						contentBlocks = append(contentBlocks, map[string]interface{}{
+							"type": "text",
+							"text": text,
+						})
+					}
+					// 转换 tool_calls → tool_use blocks
+					for _, tc := range toolCalls {
+						tcMap, ok := tc.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						fn, _ := tcMap["function"].(map[string]interface{})
+						toolID, _ := tcMap["id"].(string)
+						toolName, _ := fn["name"].(string)
+						argsStr, _ := fn["arguments"].(string)
+						var argsObj interface{}
+						if json.Unmarshal([]byte(argsStr), &argsObj) != nil {
+							argsObj = map[string]interface{}{}
+						}
+						contentBlocks = append(contentBlocks, map[string]interface{}{
+							"type":  "tool_use",
+							"id":    toolID,
+							"name":  toolName,
+							"input": argsObj,
+						})
+					}
+					claudeMessages = append(claudeMessages, map[string]interface{}{
+						"role":    "assistant",
+						"content": contentBlocks,
+					})
+				} else {
+					claudeMessages = append(claudeMessages, map[string]interface{}{
+						"role":    "assistant",
+						"content": content,
+					})
+				}
+			case "tool":
+				// OpenAI tool result → Claude tool_result（作为 user 消息）
+				toolCallID, _ := m["tool_call_id"].(string)
+				contentStr := ""
+				if s, ok := content.(string); ok {
+					contentStr = s
+				}
 				claudeMessages = append(claudeMessages, map[string]interface{}{
-					"role":    "assistant",
-					"content": content,
+					"role": "user",
+					"content": []map[string]interface{}{
+						{
+							"type":        "tool_result",
+							"tool_use_id": toolCallID,
+							"content":     contentStr,
+						},
+					},
 				})
 			default:
-				// 其他角色（tool 等）作为 user 消息传递
 				claudeMessages = append(claudeMessages, map[string]interface{}{
 					"role":    "user",
 					"content": content,
@@ -424,6 +477,39 @@ func convertChatToClaudeRequest(bodyBytes []byte, model string, isStream bool) (
 			claudeReq["system"] = strings.Join(systemParts, "\n\n")
 		}
 		claudeReq["messages"] = claudeMessages
+	}
+
+	// 转换 tools：OpenAI function → Claude tools
+	if tools, ok := reqMap["tools"].([]interface{}); ok && len(tools) > 0 {
+		var claudeTools []map[string]interface{}
+		for _, tool := range tools {
+			t, ok := tool.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			fn, ok := t["function"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+			claudeTool := map[string]interface{}{
+				"name": fn["name"],
+			}
+			if desc, ok := fn["description"]; ok {
+				claudeTool["description"] = desc
+			}
+			if params, ok := fn["parameters"]; ok {
+				claudeTool["input_schema"] = params
+			} else {
+				claudeTool["input_schema"] = map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+				}
+			}
+			claudeTools = append(claudeTools, claudeTool)
+		}
+		if len(claudeTools) > 0 {
+			claudeReq["tools"] = claudeTools
+		}
 	}
 
 	return claudeReq, nil
@@ -506,16 +592,71 @@ func handleSuccess(
 
 // convertClaudeResponseToChat 将 Claude 非流式响应转换为 OpenAI Chat 格式
 func convertClaudeResponseToChat(claudeResp map[string]interface{}, model string) map[string]interface{} {
-	// 提取文本内容
+	// 提取文本内容和 tool_use blocks
 	var text string
+	var toolCalls []map[string]interface{}
+	toolCallIndex := 0
+
 	if content, ok := claudeResp["content"].([]interface{}); ok {
 		for _, block := range content {
-			if b, ok := block.(map[string]interface{}); ok {
+			b, ok := block.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			blockType, _ := b["type"].(string)
+			switch blockType {
+			case "text":
+				if t, ok := b["text"].(string); ok {
+					text += t
+				}
+			case "tool_use":
+				// Claude tool_use → OpenAI tool_calls
+				toolID, _ := b["id"].(string)
+				toolName, _ := b["name"].(string)
+				inputRaw, _ := json.Marshal(b["input"])
+				toolCalls = append(toolCalls, map[string]interface{}{
+					"index": toolCallIndex,
+					"id":    toolID,
+					"type":  "function",
+					"function": map[string]interface{}{
+						"name":      toolName,
+						"arguments": string(inputRaw),
+					},
+				})
+				toolCallIndex++
+			default:
+				// 其他类型（如 image）提取 text 字段（如有）
 				if t, ok := b["text"].(string); ok {
 					text += t
 				}
 			}
 		}
+	}
+
+	// 映射 stop_reason
+	finishReason := "stop"
+	if stopReason, ok := claudeResp["stop_reason"].(string); ok {
+		switch stopReason {
+		case "max_tokens":
+			finishReason = "length"
+		case "tool_use":
+			finishReason = "tool_calls"
+		default: // end_turn, stop_sequence
+			finishReason = "stop"
+		}
+	}
+
+	// 构建 message
+	message := map[string]interface{}{
+		"role": "assistant",
+	}
+	if text != "" {
+		message["content"] = text
+	} else {
+		message["content"] = nil
+	}
+	if len(toolCalls) > 0 {
+		message["tool_calls"] = toolCalls
 	}
 
 	// 构建 OpenAI Chat 格式响应
@@ -526,12 +667,9 @@ func convertClaudeResponseToChat(claudeResp map[string]interface{}, model string
 		"model":   model,
 		"choices": []map[string]interface{}{
 			{
-				"index": 0,
-				"message": map[string]interface{}{
-					"role":    "assistant",
-					"content": text,
-				},
-				"finish_reason": "stop",
+				"index":         0,
+				"message":       message,
+				"finish_reason": finishReason,
 			},
 		},
 	}
