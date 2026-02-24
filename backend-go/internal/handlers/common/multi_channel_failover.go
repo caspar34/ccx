@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// MultiChannelAttemptResult 描述一次“选中渠道”的尝试结果（用于多渠道 failover 外壳复用）。
+// MultiChannelAttemptResult 描述一次"选中渠道"的尝试结果（用于多渠道 failover 外壳复用）。
 type MultiChannelAttemptResult struct {
 	Handled           bool
 	Attempted         bool
@@ -24,14 +24,14 @@ type MultiChannelAttemptResult struct {
 // TrySelectedChannelFunc 尝试一次选中的渠道，返回该渠道的尝试结果。
 type TrySelectedChannelFunc func(selection *scheduler.SelectionResult) MultiChannelAttemptResult
 
-// OnMultiChannelHandledFunc 在请求被“处理完成”时回调（成功或非 failover 错误都会触发）。
+// OnMultiChannelHandledFunc 在请求被"处理完成"时回调（成功或非 failover 错误都会触发）。
 type OnMultiChannelHandledFunc func(selection *scheduler.SelectionResult, result MultiChannelAttemptResult)
 
-// HandleAllFailedFunc 处理“所有渠道都失败”的返回逻辑（不同入口可能有不同错误格式）。
+// HandleAllFailedFunc 处理"所有渠道都失败"的返回逻辑（不同入口可能有不同错误格式）。
 type HandleAllFailedFunc func(c *gin.Context, failoverErr *FailoverError, lastError error)
 
 // HandleMultiChannelFailover 处理多渠道 failover 外壳逻辑（选渠道 + 聚合错误 + Trace 亲和）。
-// 具体“渠道内 Key/BaseURL 轮转”由 trySelectedChannel 实现（通常调用 TryUpstreamWithAllKeys）。
+// 具体"渠道内 Key/BaseURL 轮转"由 trySelectedChannel 实现（通常调用 TryUpstreamWithAllKeys）。
 func HandleMultiChannelFailover(
 	c *gin.Context,
 	envCfg *config.EnvConfig,
@@ -39,6 +39,7 @@ func HandleMultiChannelFailover(
 	kind scheduler.ChannelKind,
 	apiType string,
 	userID string,
+	model string,
 	trySelectedChannel TrySelectedChannelFunc,
 	onHandled OnMultiChannelHandledFunc,
 	handleAllFailed HandleAllFailedFunc,
@@ -70,7 +71,7 @@ func HandleMultiChannelFailover(
 			// 继续正常流程
 		}
 
-		selection, err := channelScheduler.SelectChannel(c.Request.Context(), userID, failedChannels, kind)
+		selection, err := channelScheduler.SelectChannel(c.Request.Context(), userID, failedChannels, kind, model)
 		if err != nil {
 			lastError = err
 			break

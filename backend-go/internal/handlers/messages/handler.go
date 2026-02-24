@@ -88,6 +88,7 @@ func handleMultiChannel(
 		scheduler.ChannelKindMessages,
 		"Messages",
 		userID,
+		claudeReq.Model,
 		func(selection *scheduler.SelectionResult) common.MultiChannelAttemptResult {
 			upstream := selection.Upstream
 			channelIndex := selection.ChannelIndex

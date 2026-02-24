@@ -93,6 +93,7 @@ func handleMultiChannel(
 		scheduler.ChannelKindResponses,
 		"Responses",
 		userID,
+		responsesReq.Model,
 		func(selection *scheduler.SelectionResult) common.MultiChannelAttemptResult {
 			upstream := selection.Upstream
 			channelIndex := selection.ChannelIndex

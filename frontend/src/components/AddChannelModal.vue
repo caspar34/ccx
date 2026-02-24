@@ -636,6 +636,24 @@
                 density="comfortable"
               />
             </v-col>
+
+            <!-- 支持的模型白名单 -->
+            <v-col cols="12">
+              <v-combobox
+                v-model="form.supportedModels"
+                label="支持的模型 (可选)"
+                placeholder="输入模型名称后按回车添加，如 gpt-4o、claude-*"
+                prepend-inner-icon="mdi-brain"
+                hint="留空表示支持所有模型。支持通配符，如 gpt-4* 匹配 gpt-4o、gpt-4-turbo 等"
+                persistent-hint
+                clearable
+                multiple
+                chips
+                closable-chips
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
           </v-row>
         </v-form>
       </v-card-text>
@@ -1146,7 +1164,8 @@ const form = reactive({
   apiKeys: [] as string[],
   modelMapping: {} as Record<string, string>,
   customHeaders: {} as Record<string, string>,
-  proxyUrl: ''
+  proxyUrl: '',
+  supportedModels: [] as string[]
 })
 
 // 多 BaseURL 文本输入（独立变量，保留用户输入的换行）
@@ -1351,6 +1370,7 @@ const resetForm = () => {
   form.modelMapping = {}
   form.customHeaders = {}
   form.proxyUrl = ''
+  form.supportedModels = []
   newApiKey.value = ''
   newMapping.source = ''
   newMapping.target = ''
@@ -1415,6 +1435,7 @@ const loadChannelData = (channel: Channel) => {
   form.modelMapping = { ...(channel.modelMapping || {}) }
   form.customHeaders = { ...(channel.customHeaders || {}) }
   form.proxyUrl = channel.proxyUrl || ''
+  form.supportedModels = channel.supportedModels || []
 
   // 立即同步 baseUrl 到预览变量，避免等待 debounce
   formBaseUrlPreview.value = channel.baseUrl
@@ -1690,7 +1711,8 @@ const handleSubmit = async () => {
     apiKeys: processedApiKeys,
     modelMapping: form.modelMapping,
     customHeaders: form.customHeaders,  // 始终传递，空对象表示清除
-    proxyUrl: form.proxyUrl.trim()
+    proxyUrl: form.proxyUrl.trim(),
+    supportedModels: form.supportedModels  // 空数组表示支持所有模型，始终传递以支持清空
   }
 
   // 多 BaseURL 支持

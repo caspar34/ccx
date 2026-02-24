@@ -106,6 +106,7 @@ export interface Channel {
   lowQuality?: boolean       // 低质量渠道标记：启用后强制本地估算 token，偏差>5%时使用本地值
   injectDummyThoughtSignature?: boolean  // Gemini 特定：为 functionCall 注入 dummy thought_signature（兼容第三方 API）
   stripThoughtSignature?: boolean        // Gemini 特定：移除 thought_signature 字段（兼容旧版 Gemini API）
+  supportedModels?: string[]  // 支持的模型白名单（空=全部），支持通配符如 gpt-4*
 }
 
 export interface ChannelsResponse {

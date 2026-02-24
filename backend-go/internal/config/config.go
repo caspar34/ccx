@@ -37,6 +37,8 @@ type UpstreamConfig struct {
 	CustomHeaders map[string]string `json:"customHeaders,omitempty"` // 自定义请求头（覆盖或添加到上游请求）
 	// 渠道级代理
 	ProxyURL string `json:"proxyUrl,omitempty"` // HTTP/HTTPS/SOCKS5 代理地址
+	// 模型白名单
+	SupportedModels []string `json:"supportedModels,omitempty"` // 支持的模型白名单（空=全部），支持通配符如 gpt-4*
 }
 
 // UpstreamUpdate 用于部分更新 UpstreamConfig
@@ -62,6 +64,8 @@ type UpstreamUpdate struct {
 	CustomHeaders map[string]string `json:"customHeaders"`
 	// 渠道级代理
 	ProxyURL *string `json:"proxyUrl"`
+	// 模型白名单
+	SupportedModels []string `json:"supportedModels"` // 支持的模型白名单（空=全部），支持通配符如 gpt-4*
 }
 
 // Config 配置结构

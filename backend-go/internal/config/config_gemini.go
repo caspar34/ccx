@@ -195,6 +195,9 @@ func (cm *ConfigManager) UpdateGeminiUpstream(index int, updates UpstreamUpdate)
 	if updates.ProxyURL != nil {
 		upstream.ProxyURL = *updates.ProxyURL
 	}
+	if updates.SupportedModels != nil {
+		upstream.SupportedModels = updates.SupportedModels
+	}
 
 	if err := cm.saveConfigLocked(cm.config); err != nil {
 		return false, err

@@ -95,23 +95,28 @@ func (s *ChannelScheduler) SelectChannel(
 	userID string,
 	failedChannels map[int]bool,
 	kind ChannelKind,
+	model string,
 ) (*SelectionResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// 获取活跃渠道列表
-	activeChannels := s.getActiveChannels(kind)
+	// 获取活跃渠道列表（含模型过滤）
+	activeChannels := s.getActiveChannels(kind, model)
 	if len(activeChannels) == 0 {
+		// 区分"无活跃渠道"和"无渠道支持该模型"
+		kindName := "Messages"
 		switch kind {
 		case ChannelKindGemini:
-			return nil, fmt.Errorf("没有可用的活跃 Gemini 渠道")
+			kindName = "Gemini"
 		case ChannelKindResponses:
-			return nil, fmt.Errorf("没有可用的活跃 Responses 渠道")
+			kindName = "Responses"
 		case ChannelKindChat:
-			return nil, fmt.Errorf("没有可用的活跃 Chat 渠道")
-		default:
-			return nil, fmt.Errorf("没有可用的活跃 Messages 渠道")
+			kindName = "Chat"
 		}
+		if model != "" && len(s.getActiveChannels(kind, "")) > 0 {
+			return nil, fmt.Errorf("没有 %s 渠道支持模型 %q，请检查渠道的 supportedModels 配置", kindName, model)
+		}
+		return nil, fmt.Errorf("没有可用的活跃 %s 渠道", kindName)
 	}
 
 	// 获取对应类型的指标管理器
@@ -284,7 +289,7 @@ type ChannelInfo struct {
 }
 
 // getActiveChannels 获取活跃渠道列表（按优先级排序）
-func (s *ChannelScheduler) getActiveChannels(kind ChannelKind) []ChannelInfo {
+func (s *ChannelScheduler) getActiveChannels(kind ChannelKind, model string) []ChannelInfo {
 	cfg := s.configManager.GetConfig()
 
 	var upstreams []config.UpstreamConfig
@@ -309,6 +314,11 @@ func (s *ChannelScheduler) getActiveChannels(kind ChannelKind) []ChannelInfo {
 
 		// 只选择 active 状态的渠道（suspended 也算在活跃序列中，但会被健康检查过滤）
 		if status != "disabled" {
+			// 过滤不支持当前模型的渠道
+			if model != "" && !upstream.SupportsModel(model) {
+				continue
+			}
+
 			priority := upstream.Priority
 			if priority == 0 {
 				priority = i // 默认优先级为索引
@@ -578,7 +588,7 @@ func (s *ChannelScheduler) isUpstreamInConfig(upstream *config.UpstreamConfig, k
 
 // GetActiveChannelCount 获取活跃渠道数量
 func (s *ChannelScheduler) GetActiveChannelCount(kind ChannelKind) int {
-	return len(s.getActiveChannels(kind))
+	return len(s.getActiveChannels(kind, ""))
 }
 
 // IsMultiChannelMode 判断是否为多渠道模式

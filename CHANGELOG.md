@@ -2,6 +2,10 @@
 
 ### 新增
 
+- **渠道模型白名单过滤** - 为渠道配置支持的模型列表，调度器自动跳过不支持当前请求模型的渠道
+  - 后端：`UpstreamConfig` 新增 `SupportedModels` 字段，`SupportsModel()` 支持精确匹配和通配符前缀匹配（如 `gpt-4*`），`SelectChannel` / `getActiveChannels` 按模型过滤渠道，四类 Handler 调用链传入 model 参数
+  - 前端：渠道编辑表单新增"支持的模型"Combobox（Chips 输入），`Channel` 接口支持 `supportedModels` 字段
+  - 空列表表示支持所有模型，向后兼容
 - **渠道级代理（Proxy）支持** - 为每个渠道配置独立的 HTTP/SOCKS5 代理，用于通过代理访问特定上游服务（网络隔离、地域限制等场景）
   - 后端：`UpstreamConfig` 新增 `ProxyURL` 字段，`GetStandardClient`/`GetStreamClient` 支持代理配置，`SendRequest` 传递代理参数并记录脱敏日志
   - 前端：渠道编辑表单新增代理 URL 输入框，`Channel` 接口支持 `proxyUrl` 字段

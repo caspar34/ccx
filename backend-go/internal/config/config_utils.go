@@ -161,8 +161,30 @@ func (u *UpstreamConfig) Clone() *UpstreamConfig {
 		t := *u.PromotionUntil
 		cloned.PromotionUntil = &t
 	}
+	if u.SupportedModels != nil {
+		cloned.SupportedModels = make([]string, len(u.SupportedModels))
+		copy(cloned.SupportedModels, u.SupportedModels)
+	}
 
 	return &cloned
+}
+
+// SupportsModel 检查渠道是否支持指定模型
+// 空列表表示支持所有模型，支持通配符前缀匹配（如 gpt-4* 匹配 gpt-4o）
+func (u *UpstreamConfig) SupportsModel(model string) bool {
+	if len(u.SupportedModels) == 0 {
+		return true
+	}
+	for _, pattern := range u.SupportedModels {
+		if strings.HasSuffix(pattern, "*") {
+			if strings.HasPrefix(model, strings.TrimSuffix(pattern, "*")) {
+				return true
+			}
+		} else if pattern == model {
+			return true
+		}
+	}
+	return false
 }
 
 // GetEffectiveBaseURL 获取当前应使用的 BaseURL（纯 failover 模式）

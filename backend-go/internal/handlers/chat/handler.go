@@ -114,6 +114,7 @@ func handleMultiChannel(
 		scheduler.ChannelKindChat,
 		"Chat",
 		userID,
+		model,
 		func(selection *scheduler.SelectionResult) common.MultiChannelAttemptResult {
 			upstream := selection.Upstream
 			channelIndex := selection.ChannelIndex
