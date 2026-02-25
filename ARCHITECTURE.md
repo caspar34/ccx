@@ -1,6 +1,6 @@
-# Claude / Codex / Gemini API Proxy - CCX
+# Claude / Codex / Gemini / OpenAI Chat API Proxy - CCX
 
-本文档详细介绍 Claude / Codex / Gemini API Proxy - CCX 的架构设计、技术选型和实现细节。
+本文档详细介绍 Claude / Codex / Gemini / OpenAI Chat API Proxy - CCX 的架构设计、技术选型和实现细节。
 
 ## 项目结构
 
@@ -673,6 +673,7 @@ func AuthMiddleware() gin.HandlerFunc {
 2. 管理 API (`/api/*`)
 3. Messages API (`/v1/messages`)
 4. Responses API (`/v1/responses`)
+5. Chat Completions API (`/v1/chat/completions`)
 
 **公开入口**:
 - 健康检查 (`/health`)

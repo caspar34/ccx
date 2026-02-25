@@ -73,11 +73,13 @@ ccx/
 - `POST /v1/messages/count_tokens` - Token 计数
 - `POST /v1/responses` - Codex Responses API（支持会话管理）
 - `POST /v1/responses/compact` - 精简版 Responses API
+- `POST /v1/chat/completions` - OpenAI Chat Completions API（支持 Claude/Gemini 协议转换）
 - `GET /health` - 健康检查（无需认证）
 
 **管理 API** (`/api/`):
 - `/api/messages/channels` - Messages 渠道 CRUD
 - `/api/responses/channels` - Responses 渠道 CRUD
+- `/api/chat/channels` - Chat 渠道 CRUD
 - `/api/messages/channels/metrics` - 渠道指标
 - `/api/messages/channels/scheduler/stats` - 调度器统计
 - `/api/messages/ping/:id` - 渠道连通性测试

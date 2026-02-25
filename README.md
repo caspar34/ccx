@@ -155,6 +155,7 @@ docker-compose up -d
 - **Web 管理界面**: http://localhost:3000
 - **Messages API 端点**: http://localhost:3000/v1/messages
 - **Responses API 端点**: http://localhost:3000/v1/responses
+- **Chat Completions API 端点**: http://localhost:3000/v1/chat/completions
 - **Gemini API 端点**: http://localhost:3000/v1beta/models/{model}:generateContent
 - **健康检查**: http://localhost:3000/health
 
