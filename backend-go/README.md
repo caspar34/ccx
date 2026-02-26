@@ -158,8 +158,7 @@ CORS_ORIGIN=*
       "serviceType": "openai",
       "status": "active"
     }
-  ],
-  "loadBalance": "failover"
+  ]
 }
 ```
 

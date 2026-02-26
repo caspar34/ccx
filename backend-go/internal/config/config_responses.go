@@ -311,25 +311,6 @@ func (cm *ConfigManager) GetNextResponsesAPIKey(upstream *UpstreamConfig, failed
 	return cm.GetNextAPIKey(upstream, failedKeys, "Responses")
 }
 
-// SetResponsesLoadBalance 设置 Responses 负载均衡策略
-func (cm *ConfigManager) SetResponsesLoadBalance(strategy string) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if err := validateLoadBalanceStrategy(strategy); err != nil {
-		return err
-	}
-
-	cm.config.ResponsesLoadBalance = strategy
-
-	if err := cm.saveConfigLocked(cm.config); err != nil {
-		return err
-	}
-
-	log.Printf("[Config-LoadBalance] 已设置 Responses 负载均衡策略: %s", strategy)
-	return nil
-}
-
 // MoveResponsesAPIKeyToTop 将指定 Responses 渠道的 API 密钥移到最前面
 func (cm *ConfigManager) MoveResponsesAPIKeyToTop(upstreamIndex int, apiKey string) error {
 	cm.mu.Lock()

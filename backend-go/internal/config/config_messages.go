@@ -309,25 +309,6 @@ func (cm *ConfigManager) RemoveAPIKey(index int, apiKey string) error {
 	return nil
 }
 
-// SetLoadBalance 设置 Messages 负载均衡策略
-func (cm *ConfigManager) SetLoadBalance(strategy string) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if err := validateLoadBalanceStrategy(strategy); err != nil {
-		return err
-	}
-
-	cm.config.LoadBalance = strategy
-
-	if err := cm.saveConfigLocked(cm.config); err != nil {
-		return err
-	}
-
-	log.Printf("[Config-LoadBalance] 已设置负载均衡策略: %s", strategy)
-	return nil
-}
-
 // MoveAPIKeyToTop 将指定渠道的 API 密钥移到最前面
 func (cm *ConfigManager) MoveAPIKeyToTop(upstreamIndex int, apiKey string) error {
 	cm.mu.Lock()

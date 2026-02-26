@@ -15,7 +15,6 @@ func GetDashboard(cfgManager *config.ConfigManager, sch *scheduler.ChannelSchedu
 	return func(c *gin.Context) {
 		cfg := cfgManager.GetConfig()
 		upstreams := cfg.ChatUpstream
-		loadBalance := cfg.ChatLoadBalance
 		metricsManager := sch.GetChatMetricsManager()
 
 		// 1. 构建 channels 数据
@@ -95,7 +94,6 @@ func GetDashboard(cfgManager *config.ConfigManager, sch *scheduler.ChannelSchedu
 		// 返回合并数据
 		c.JSON(200, gin.H{
 			"channels":       channels,
-			"loadBalance":    loadBalance,
 			"metrics":        metricsResult,
 			"stats":          stats,
 			"recentActivity": recentActivity,

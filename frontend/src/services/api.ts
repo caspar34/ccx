@@ -112,13 +112,11 @@ export interface Channel {
 export interface ChannelsResponse {
   channels: Channel[]
   current: number
-  loadBalance: string
 }
 
 // 渠道仪表盘响应（合并 channels + metrics + stats）
 export interface ChannelDashboardResponse {
   channels: Channel[]
-  loadBalance: string
   metrics: ChannelMetrics[]
   stats: {
     multiChannelMode: boolean
@@ -466,20 +464,6 @@ class ApiService {
     return this.request('/messages/ping')
   }
 
-  async updateLoadBalance(strategy: string): Promise<void> {
-    await this.request('/loadbalance', {
-      method: 'PUT',
-      body: JSON.stringify({ strategy })
-    })
-  }
-
-  async updateResponsesLoadBalance(strategy: string): Promise<void> {
-    await this.request('/responses/loadbalance', {
-      method: 'PUT',
-      body: JSON.stringify({ strategy })
-    })
-  }
-
   // ============== Responses 渠道管理 API ==============
 
   async getResponsesChannels(): Promise<ChannelsResponse> {
@@ -819,13 +803,6 @@ class ApiService {
     })
   }
 
-  async updateChatLoadBalance(strategy: string): Promise<void> {
-    await this.request('/chat/loadbalance', {
-      method: 'PUT',
-      body: JSON.stringify({ strategy })
-    })
-  }
-
   // ============== Chat 历史指标 API ==============
 
   async getChatChannelMetricsHistory(duration: '1h' | '6h' | '24h' = '24h'): Promise<MetricsHistoryResponse[]> {
@@ -933,13 +910,6 @@ class ApiService {
     await this.request(`/gemini/channels/${channelId}/promotion`, {
       method: 'POST',
       body: JSON.stringify({ duration: durationSeconds })
-    })
-  }
-
-  async updateGeminiLoadBalance(strategy: string): Promise<void> {
-    await this.request('/gemini/loadbalance', {
-      method: 'PUT',
-      body: JSON.stringify({ strategy })
     })
   }
 

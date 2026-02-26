@@ -42,12 +42,14 @@ func GetUpstreams(cfgManager *config.ConfigManager) gin.HandlerFunc {
 				"lowQuality":                  up.LowQuality,
 				"injectDummyThoughtSignature": up.InjectDummyThoughtSignature,
 				"stripThoughtSignature":       up.StripThoughtSignature,
+				"customHeaders":               up.CustomHeaders,
+				"proxyUrl":                    up.ProxyURL,
+				"supportedModels":             up.SupportedModels,
 			}
 		}
 
 		c.JSON(200, gin.H{
-			"channels":    upstreams,
-			"loadBalance": cfg.GeminiLoadBalance,
+			"channels": upstreams,
 		})
 	}
 }
@@ -429,30 +431,6 @@ func PingAllChannels(cfgManager *config.ConfigManager) gin.HandlerFunc {
 
 		c.JSON(200, gin.H{
 			"channels": results,
-		})
-	}
-}
-
-// UpdateLoadBalance 更新 Gemini 负载均衡策略
-func UpdateLoadBalance(cfgManager *config.ConfigManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req struct {
-			Strategy string `json:"strategy"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request body"})
-			return
-		}
-
-		if err := cfgManager.SetGeminiLoadBalance(req.Strategy); err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(200, gin.H{
-			"success":  true,
-			"message":  "Gemini 负载均衡策略已更新",
-			"strategy": req.Strategy,
 		})
 	}
 }

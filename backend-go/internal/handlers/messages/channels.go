@@ -40,12 +40,14 @@ func GetUpstreams(cfgManager *config.ConfigManager) gin.HandlerFunc {
 				"priority":           priority,
 				"promotionUntil":     up.PromotionUntil,
 				"lowQuality":         up.LowQuality,
+				"customHeaders":      up.CustomHeaders,
+				"proxyUrl":           up.ProxyURL,
+				"supportedModels":    up.SupportedModels,
 			}
 		}
 
 		c.JSON(200, gin.H{
-			"channels":    upstreams,
-			"loadBalance": cfg.LoadBalance,
+			"channels": upstreams,
 		})
 	}
 }
@@ -254,33 +256,6 @@ func MoveApiKeyToBottom(cfgManager *config.ConfigManager) gin.HandlerFunc {
 		}
 
 		c.JSON(200, gin.H{"message": "API密钥已移到底部"})
-	}
-}
-
-// UpdateLoadBalance 更新负载均衡策略
-func UpdateLoadBalance(cfgManager *config.ConfigManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req struct {
-			Strategy string `json:"strategy"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request body"})
-			return
-		}
-
-		if err := cfgManager.SetLoadBalance(req.Strategy); err != nil {
-			if strings.Contains(err.Error(), "无效的负载均衡策略") {
-				c.JSON(400, gin.H{"error": err.Error()})
-			} else {
-				c.JSON(500, gin.H{"error": "Failed to save config"})
-			}
-			return
-		}
-
-		c.JSON(200, gin.H{
-			"message":  "负载均衡策略已更新",
-			"strategy": req.Strategy,
-		})
 	}
 }
 

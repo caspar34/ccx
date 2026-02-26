@@ -72,20 +72,16 @@ type UpstreamUpdate struct {
 type Config struct {
 	Upstream        []UpstreamConfig `json:"upstream"`
 	CurrentUpstream int              `json:"currentUpstream,omitempty"` // 已废弃：旧格式兼容用
-	LoadBalance     string           `json:"loadBalance"`               // round-robin, random, failover
 
 	// Responses 接口专用配置（独立于 /v1/messages）
 	ResponsesUpstream        []UpstreamConfig `json:"responsesUpstream"`
 	CurrentResponsesUpstream int              `json:"currentResponsesUpstream,omitempty"` // 已废弃：旧格式兼容用
-	ResponsesLoadBalance     string           `json:"responsesLoadBalance"`
 
 	// Gemini 接口专用配置（独立于 /v1/messages 和 /v1/responses）
-	GeminiUpstream    []UpstreamConfig `json:"geminiUpstream"`
-	GeminiLoadBalance string           `json:"geminiLoadBalance"`
+	GeminiUpstream []UpstreamConfig `json:"geminiUpstream"`
 
 	// Chat Completions 接口专用配置（OpenAI /v1/chat/completions 兼容）
-	ChatUpstream    []UpstreamConfig `json:"chatUpstream,omitempty"`
-	ChatLoadBalance string           `json:"chatLoadBalance,omitempty"`
+	ChatUpstream []UpstreamConfig `json:"chatUpstream,omitempty"`
 
 	// Fuzzy 模式：启用时模糊处理错误，所有非 2xx 错误都尝试 failover
 	FuzzyModeEnabled bool `json:"fuzzyModeEnabled"`

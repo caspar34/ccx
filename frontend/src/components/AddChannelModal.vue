@@ -274,6 +274,24 @@
               </v-card>
             </v-col>
 
+            <!-- 支持的模型白名单 -->
+            <v-col cols="12">
+              <v-combobox
+                v-model="form.supportedModels"
+                label="支持的模型 (可选)"
+                placeholder="输入模型名称后按回车添加，如 gpt-4o、claude-*"
+                prepend-inner-icon="mdi-brain"
+                hint="留空表示支持所有模型。支持通配符，如 gpt-4* 匹配 gpt-4o、gpt-4-turbo 等"
+                persistent-hint
+                clearable
+                multiple
+                chips
+                closable-chips
+                variant="outlined"
+                density="comfortable"
+              />
+            </v-col>
+
             <!-- API密钥管理 -->
             <v-col cols="12">
               <v-card variant="outlined" rounded="lg" :color="form.apiKeys.length === 0 ? 'error' : undefined">
@@ -637,23 +655,6 @@
               />
             </v-col>
 
-            <!-- 支持的模型白名单 -->
-            <v-col cols="12">
-              <v-combobox
-                v-model="form.supportedModels"
-                label="支持的模型 (可选)"
-                placeholder="输入模型名称后按回车添加，如 gpt-4o、claude-*"
-                prepend-inner-icon="mdi-brain"
-                hint="留空表示支持所有模型。支持通配符，如 gpt-4* 匹配 gpt-4o、gpt-4-turbo 等"
-                persistent-hint
-                clearable
-                multiple
-                chips
-                closable-chips
-                variant="outlined"
-                density="comfortable"
-              />
-            </v-col>
           </v-row>
         </v-form>
       </v-card-text>

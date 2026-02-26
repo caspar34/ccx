@@ -568,15 +568,6 @@ const pingAllChannels = async () => {
   }
 }
 
-const _updateLoadBalance = async (strategy: string) => {
-  try {
-    const result = await channelStore.updateLoadBalance(strategy)
-    showToast(result.message, 'success')
-  } catch (error) {
-    showToast(`更新负载均衡策略失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
-  }
-}
-
 // Fuzzy 模式管理
 const loadFuzzyModeStatus = async () => {
   systemStore.setFuzzyModeLoadError(false)

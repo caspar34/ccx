@@ -35,26 +35,22 @@ export const useChannelStore = defineStore('channel', () => {
   // 三种 API 类型的渠道数据
   const channelsData = ref<ChannelsResponse>({
     channels: [],
-    current: -1,
-    loadBalance: 'round-robin'
+    current: -1
   })
 
   const responsesChannelsData = ref<ChannelsResponse>({
     channels: [],
-    current: -1,
-    loadBalance: 'round-robin'
+    current: -1
   })
 
   const geminiChannelsData = ref<ChannelsResponse>({
     channels: [],
-    current: -1,
-    loadBalance: 'round-robin'
+    current: -1
   })
 
   const chatChannelsData = ref<ChannelsResponse>({
     channels: [],
-    current: -1,
-    loadBalance: 'round-robin'
+    current: -1
   })
 
   // Dashboard 数据缓存结构（每个 tab 独立缓存）
@@ -173,8 +169,7 @@ export const useChannelStore = defineStore('channel', () => {
           const dashboard = await api.getGeminiChannelDashboard()
           geminiChannelsData.value = {
             channels: mergeChannelsWithLocalData(dashboard.channels, geminiChannelsData.value.channels),
-            current: geminiChannelsData.value.current,
-            loadBalance: dashboard.loadBalance
+            current: geminiChannelsData.value.current
           }
           // 更新 Gemini tab 的独立缓存
           dashboardCache.value.gemini = {
@@ -191,8 +186,7 @@ export const useChannelStore = defineStore('channel', () => {
           const dashboard = await api.getChatChannelDashboard()
           chatChannelsData.value = {
             channels: mergeChannelsWithLocalData(dashboard.channels, chatChannelsData.value.channels),
-            current: chatChannelsData.value.current,
-            loadBalance: dashboard.loadBalance
+            current: chatChannelsData.value.current
           }
           dashboardCache.value.chat = {
             metrics: dashboard.metrics,
@@ -210,7 +204,6 @@ export const useChannelStore = defineStore('channel', () => {
           channelsData.value = {
             channels: mergeChannelsWithLocalData(dashboard.channels, channelsData.value.channels),
             current: channelsData.value.current, // 保留当前选中状态
-            loadBalance: dashboard.loadBalance
           }
           // 更新 Messages tab 的独立缓存
           dashboardCache.value.messages = {
@@ -222,7 +215,6 @@ export const useChannelStore = defineStore('channel', () => {
           responsesChannelsData.value = {
             channels: mergeChannelsWithLocalData(dashboard.channels, responsesChannelsData.value.channels),
             current: responsesChannelsData.value.current, // 保留当前选中状态
-            loadBalance: dashboard.loadBalance
           }
           // 更新 Responses tab 的独立缓存
           dashboardCache.value.responses = {
@@ -424,26 +416,6 @@ export const useChannelStore = defineStore('channel', () => {
   }
 
   /**
-   * 更新负载均衡策略
-   */
-  async function updateLoadBalance(strategy: string) {
-    if (activeTab.value === 'chat') {
-      await api.updateChatLoadBalance(strategy)
-      chatChannelsData.value.loadBalance = strategy
-    } else if (activeTab.value === 'gemini') {
-      await api.updateGeminiLoadBalance(strategy)
-      geminiChannelsData.value.loadBalance = strategy
-    } else if (activeTab.value === 'messages') {
-      await api.updateLoadBalance(strategy)
-      channelsData.value.loadBalance = strategy
-    } else {
-      await api.updateResponsesLoadBalance(strategy)
-      responsesChannelsData.value.loadBalance = strategy
-    }
-    return { success: true, message: `负载均衡策略已更新为: ${strategy}` }
-  }
-
-  /**
    * 启动自动刷新定时器
    */
   function startAutoRefresh() {
@@ -486,23 +458,19 @@ export const useChannelStore = defineStore('channel', () => {
   function clearChannels() {
     channelsData.value = {
       channels: [],
-      current: -1,
-      loadBalance: 'round-robin'
+      current: -1
     }
     chatChannelsData.value = {
       channels: [],
-      current: -1,
-      loadBalance: 'round-robin'
+      current: -1
     }
     responsesChannelsData.value = {
       channels: [],
-      current: -1,
-      loadBalance: 'round-robin'
+      current: -1
     }
     geminiChannelsData.value = {
       channels: [],
-      current: -1,
-      loadBalance: 'round-robin'
+      current: -1
     }
 
     // 清空所有 tab 的独立缓存
@@ -559,7 +527,6 @@ export const useChannelStore = defineStore('channel', () => {
     deleteChannel,
     pingChannel,
     pingAllChannels,
-    updateLoadBalance,
     startAutoRefresh,
     stopAutoRefresh,
     clearChannels,

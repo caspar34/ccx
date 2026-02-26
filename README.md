@@ -630,8 +630,7 @@ GET /health
   "uptime": 3600,
   "mode": "production",
   "config": {
-    "upstreamCount": 3,
-    "loadBalance": "failover"
+    "upstreamCount": 3
   }
 }
 ```

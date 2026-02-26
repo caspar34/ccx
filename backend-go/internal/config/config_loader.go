@@ -97,12 +97,9 @@ func (cm *ConfigManager) createDefaultConfig() error {
 	defaultConfig := Config{
 		Upstream:                 []UpstreamConfig{},
 		CurrentUpstream:          0,
-		LoadBalance:              "failover",
 		ResponsesUpstream:        []UpstreamConfig{},
 		CurrentResponsesUpstream: 0,
-		ResponsesLoadBalance:     "failover",
 		GeminiUpstream:           []UpstreamConfig{},
-		GeminiLoadBalance:        "failover",
 		FuzzyModeEnabled:         true, // 默认启用 Fuzzy 模式
 		StripBillingHeader:       true, // 默认启用移除计费头
 	}
@@ -119,16 +116,6 @@ func (cm *ConfigManager) createDefaultConfig() error {
 // 返回: 是否有字段需要迁移（需要保存配置）
 func (cm *ConfigManager) applyConfigDefaults(rawJSON []byte) bool {
 	needSave := false
-
-	if cm.config.LoadBalance == "" {
-		cm.config.LoadBalance = "failover"
-	}
-	if cm.config.ResponsesLoadBalance == "" {
-		cm.config.ResponsesLoadBalance = cm.config.LoadBalance
-	}
-	if cm.config.GeminiLoadBalance == "" {
-		cm.config.GeminiLoadBalance = "failover"
-	}
 
 	// FuzzyModeEnabled 默认值处理：
 	// 由于 bool 零值是 false，无法区分"用户设为 false"和"字段不存在"

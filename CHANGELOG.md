@@ -1,3 +1,11 @@
+## [Unreleased]
+
+### 移除
+
+- **清理 LoadBalance 死代码** - 调度器完全基于优先级/促销/Trace亲和/健康状态选择渠道，`LoadBalance` 字段从未被读取
+  - 后端：删除 `Config` 结构体中 `LoadBalance`/`ResponsesLoadBalance`/`GeminiLoadBalance`/`ChatLoadBalance` 四个字段，删除 `Set*LoadBalance` 方法、`validateLoadBalanceStrategy` 验证函数、四个 `UpdateLoadBalance` Handler、两条 API 路由，清理 Dashboard/Health/Metrics 响应中的 loadBalance 返回
+  - 前端：删除 `ChannelsResponse`/`ChannelDashboardResponse` 接口中的 `loadBalance` 字段，删除四个 `update*LoadBalance` API 方法，清理 store 中所有 loadBalance 状态初始化、赋值和重置逻辑
+
 ## [v2.6.17] - 2026-02-25
 
 ### 新增

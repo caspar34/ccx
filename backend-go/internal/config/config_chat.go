@@ -453,22 +453,3 @@ func (cm *ConfigManager) GetPromotedChatChannel() (int, bool) {
 	}
 	return -1, false
 }
-
-// SetChatLoadBalance 设置 Chat 负载均衡策略
-func (cm *ConfigManager) SetChatLoadBalance(strategy string) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if err := validateLoadBalanceStrategy(strategy); err != nil {
-		return err
-	}
-
-	cm.config.ChatLoadBalance = strategy
-
-	if err := cm.saveConfigLocked(cm.config); err != nil {
-		return err
-	}
-
-	log.Printf("[Config-LoadBalance] 已设置 Chat 负载均衡策略: %s", strategy)
-	return nil
-}

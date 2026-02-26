@@ -23,8 +23,7 @@ func TestUpdateUpstream_BaseURLConsistency(t *testing.T) {
 			"baseUrls": ["https://old-1.example.com", "https://old-2.example.com"],
 			"apiKeys": ["test-key"],
 			"serviceType": "claude"
-		}],
-		"loadBalance": "failover"
+		}]
 	}`
 	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
 		t.Fatalf("写入初始配置失败: %v", err)
@@ -122,9 +121,7 @@ func TestUpdateResponsesUpstream_BaseURLConsistency(t *testing.T) {
 			"baseUrls": ["https://old-1.responses.com", "https://old-2.responses.com"],
 			"apiKeys": ["test-key"],
 			"serviceType": "claude"
-		}],
-		"loadBalance": "failover",
-		"responsesLoadBalance": "failover"
+		}]
 	}`
 	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
 		t.Fatalf("写入初始配置失败: %v", err)
@@ -169,9 +166,7 @@ func TestUpdateGeminiUpstream_BaseURLConsistency(t *testing.T) {
 			"baseUrls": ["https://old-1.gemini.com", "https://old-2.gemini.com"],
 			"apiKeys": ["test-key"],
 			"serviceType": "gemini"
-		}],
-		"loadBalance": "failover",
-		"geminiLoadBalance": "failover"
+		}]
 	}`
 	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
 		t.Fatalf("写入初始配置失败: %v", err)
@@ -370,7 +365,7 @@ func TestDeduplicateBaseURLs(t *testing.T) {
 func TestAddUpstream_BaseURLDeduplication(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.json")
-	initialConfig := `{"upstream": [], "loadBalance": "failover"}`
+	initialConfig := `{"upstream": []}`
 	if err := os.WriteFile(configPath, []byte(initialConfig), 0644); err != nil {
 		t.Fatalf("写入初始配置失败: %v", err)
 	}

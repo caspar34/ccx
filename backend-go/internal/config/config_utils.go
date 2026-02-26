@@ -41,16 +41,6 @@ func deduplicateBaseURLs(urls []string) []string {
 	return result
 }
 
-// validateLoadBalanceStrategy 验证负载均衡策略
-func validateLoadBalanceStrategy(strategy string) error {
-	// 只接受 failover 策略（round-robin 和 random 已移除）
-	// 为兼容旧配置，仍允许旧值但静默忽略
-	if strategy != "failover" && strategy != "round-robin" && strategy != "random" {
-		return &ConfigError{Message: "无效的负载均衡策略: " + strategy}
-	}
-	return nil
-}
-
 // ConfigError 配置错误
 type ConfigError struct {
 	Message string

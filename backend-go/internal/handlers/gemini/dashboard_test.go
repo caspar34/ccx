@@ -30,7 +30,6 @@ func TestGetDashboard_IncludesStripThoughtSignature(t *testing.T) {
 				StripThoughtSignature: true,
 			},
 		},
-		GeminiLoadBalance: "round-robin",
 	}
 
 	tmpDir := t.TempDir()

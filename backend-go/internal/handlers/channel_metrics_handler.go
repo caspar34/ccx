@@ -583,16 +583,13 @@ func GetChannelDashboard(cfgManager *config.ConfigManager, sch *scheduler.Channe
 
 		cfg := cfgManager.GetConfig()
 		var upstreams []config.UpstreamConfig
-		var loadBalance string
 		var metricsManager *metrics.MetricsManager
 
 		if isResponses {
 			upstreams = cfg.ResponsesUpstream
-			loadBalance = cfg.ResponsesLoadBalance
 			metricsManager = sch.GetResponsesMetricsManager()
 		} else {
 			upstreams = cfg.Upstream
-			loadBalance = cfg.LoadBalance
 			metricsManager = sch.GetMessagesMetricsManager()
 		}
 
@@ -673,7 +670,6 @@ func GetChannelDashboard(cfgManager *config.ConfigManager, sch *scheduler.Channe
 		// 返回合并数据
 		c.JSON(200, gin.H{
 			"channels":       channels,
-			"loadBalance":    loadBalance,
 			"metrics":        metricsResult,
 			"stats":          stats,
 			"recentActivity": recentActivity,
