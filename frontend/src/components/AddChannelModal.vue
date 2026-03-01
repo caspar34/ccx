@@ -1088,9 +1088,13 @@ const allSourceModelOptions = computed(() => {
       { title: 'gemini-2.5-flash-native-audio-preview-12-2025', value: 'gemini-2.5-flash-native-audio-preview-12-2025' },
       { title: 'gemini-2.5-pro', value: 'gemini-2.5-pro' },
       { title: 'gemini-2.5-pro-preview-tts', value: 'gemini-2.5-pro-preview-tts' },
-      { title: 'gemini-3-pro-preview', value: 'gemini-3-pro-preview' },
+      { title: 'gemini-3-flash', value: 'gemini-3-flash' },
       { title: 'gemini-3-flash-preview', value: 'gemini-3-flash-preview' },
-      { title: 'gemini-3-pro-image-preview', value: 'gemini-3-pro-image-preview' }
+      { title: 'gemini-3-pro', value: 'gemini-3-pro' },
+      { title: 'gemini-3-pro-preview', value: 'gemini-3-pro-preview' },
+      { title: 'gemini-3-pro-image-preview', value: 'gemini-3-pro-image-preview' },
+      { title: 'gemini-3.1-pro', value: 'gemini-3.1-pro' },
+      { title: 'gemini-3.1-pro-preview', value: 'gemini-3.1-pro-preview' }
     ]
   }
   if (props.channelType === 'responses') {
