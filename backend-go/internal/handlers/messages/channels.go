@@ -2,6 +2,9 @@
 package messages
 
 import (
+	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +14,7 @@ import (
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/httpclient"
 	"github.com/BenedictKing/ccx/internal/scheduler"
+	"github.com/BenedictKing/ccx/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -483,5 +487,107 @@ func PingAllChannels(cfgManager *config.ConfigManager) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, finalResults)
+	}
+}
+
+// GetModelsRequest 获取模型列表的请求体
+type GetModelsRequest struct {
+	Key     string `json:"key"`
+	BaseURL string `json:"baseUrl"`
+}
+
+// GetChannelModels 获取指定渠道的模型列表（支持临时 Key）
+func GetChannelModels(cfgManager *config.ConfigManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. 解析渠道 ID
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
+			return
+		}
+
+		// 2. 从请求体读取参数
+		var req GetModelsRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		// 3. 获取 baseUrl（优先使用请求体中的临时 baseUrl，用于新增渠道场景）
+		var baseURL string
+		var channelName string
+		var insecureSkipVerify bool
+		var proxyURL string
+
+		if req.BaseURL != "" {
+			// 新增模式：使用临时 baseUrl
+			// SSRF 防护：验证用户提供的 baseURL
+			if err := utils.ValidateBaseURL(req.BaseURL); err != nil {
+				log.Printf("[Messages-Models] SSRF 防护拦截: %v", err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("无效的 baseUrl: %v", err)})
+				return
+			}
+			baseURL = req.BaseURL
+			channelName = "临时渠道"
+			insecureSkipVerify = false
+			proxyURL = ""
+			log.Printf("[Messages-Models] 使用临时 baseUrl: %s", baseURL)
+		} else {
+			// 编辑模式：从配置中读取渠道信息
+			cfg := cfgManager.GetConfig()
+			if id < 0 || id >= len(cfg.Upstream) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
+				return
+			}
+
+			channel := cfg.Upstream[id]
+			baseURL = channel.BaseURL
+			channelName = channel.Name
+			insecureSkipVerify = channel.InsecureSkipVerify
+			proxyURL = channel.ProxyURL
+		}
+
+		// 4. 验证 API Key
+		apiKey := req.Key
+		if apiKey == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No API key provided"})
+			return
+		}
+
+		log.Printf("[Messages-Models] 请求模型列表: channel=%s, key=%s", channelName, utils.MaskAPIKey(apiKey))
+
+		// 5. 发起请求
+		url := buildModelsURL(baseURL)
+		client := httpclient.GetManager().GetStandardClient(10*time.Second, insecureSkipVerify, proxyURL)
+
+		httpReq, err := http.NewRequestWithContext(c.Request.Context(), "GET", url, nil)
+		if err != nil {
+			log.Printf("[Messages-Models] 创建请求失败: channel=%s, url=%s, error=%v", channelName, url, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create request: %v", err)})
+			return
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			log.Printf("[Messages-Models] 请求失败: channel=%s, key=%s, url=%s, error=%v",
+				channelName, utils.MaskAPIKey(apiKey), url, err)
+			c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("Failed to fetch models: %v", err)})
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			log.Printf("[Messages-Models] 读取响应失败: channel=%s, error=%v", channelName, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to read response: %v", err)})
+			return
+		}
+
+		log.Printf("[Messages-Models] 上游响应: channel=%s, key=%s, status=%d, url=%s",
+			channelName, utils.MaskAPIKey(apiKey), resp.StatusCode, url)
+		c.Data(resp.StatusCode, "application/json", body)
 	}
 }

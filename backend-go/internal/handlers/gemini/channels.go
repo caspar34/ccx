@@ -2,8 +2,12 @@
 package gemini
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +15,7 @@ import (
 	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/BenedictKing/ccx/internal/httpclient"
 	"github.com/BenedictKing/ccx/internal/scheduler"
+	"github.com/BenedictKing/ccx/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -432,5 +437,180 @@ func PingAllChannels(cfgManager *config.ConfigManager) gin.HandlerFunc {
 		c.JSON(200, gin.H{
 			"channels": results,
 		})
+	}
+}
+
+// buildModelsURL 构建 models 端点的 URL（Gemini 使用 v1beta）
+func buildModelsURL(baseURL string) string {
+	skipVersionPrefix := strings.HasSuffix(baseURL, "#")
+	if skipVersionPrefix {
+		baseURL = strings.TrimSuffix(baseURL, "#")
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
+	versionPattern := regexp.MustCompile(`/v\d+[a-z]*$`)
+	hasVersionSuffix := versionPattern.MatchString(baseURL)
+
+	endpoint := "/models"
+	if !hasVersionSuffix && !skipVersionPrefix {
+		endpoint = "/v1beta" + endpoint // Gemini 使用 v1beta
+	}
+
+	return baseURL + endpoint
+}
+
+// GetModelsRequest 获取模型列表的请求体
+type GetModelsRequest struct {
+	Key     string `json:"key"`
+	BaseURL string `json:"baseUrl"`
+}
+
+// GetChannelModels 获取指定渠道的模型列表（支持临时 Key）
+func GetChannelModels(cfgManager *config.ConfigManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. 解析渠道 ID
+		idStr := c.Param("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
+			return
+		}
+
+		// 2. 从请求体读取参数
+		var req GetModelsRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+
+		// 3. 获取 baseUrl（优先使用请求体中的临时 baseUrl，用于新增渠道场景）
+		var baseURL string
+		var channelName string
+		var insecureSkipVerify bool
+		var proxyURL string
+
+		if req.BaseURL != "" {
+			// 新增模式：使用临时 baseUrl
+			// SSRF 防护：验证用户提供的 baseURL
+			if err := utils.ValidateBaseURL(req.BaseURL); err != nil {
+				log.Printf("[Gemini-Models] SSRF 防护拦截: %v", err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("无效的 baseUrl: %v", err)})
+				return
+			}
+			baseURL = req.BaseURL
+			channelName = "临时渠道"
+			insecureSkipVerify = false
+			proxyURL = ""
+			log.Printf("[Gemini-Models] 使用临时 baseUrl: %s", baseURL)
+		} else {
+			// 编辑模式：从配置中读取渠道信息
+			cfg := cfgManager.GetConfig()
+			if id < 0 || id >= len(cfg.GeminiUpstream) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
+				return
+			}
+
+			channel := cfg.GeminiUpstream[id]
+			baseURL = channel.BaseURL
+			channelName = channel.Name
+			insecureSkipVerify = channel.InsecureSkipVerify
+			proxyURL = channel.ProxyURL
+		}
+
+		// 4. 验证 API Key
+		apiKey := req.Key
+		if apiKey == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No API key provided"})
+			return
+		}
+
+		log.Printf("[Gemini-Models] 请求模型列表: channel=%s, key=%s", channelName, utils.MaskAPIKey(apiKey))
+
+		// 5. 发起请求
+		url := buildModelsURL(baseURL)
+		client := httpclient.GetManager().GetStandardClient(10*time.Second, insecureSkipVerify, proxyURL)
+
+		httpReq, err := http.NewRequestWithContext(c.Request.Context(), "GET", url, nil)
+		if err != nil {
+			log.Printf("[Gemini-Models] 创建请求失败: channel=%s, url=%s, error=%v", channelName, url, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create request: %v", err)})
+			return
+		}
+		httpReq.Header.Set("x-goog-api-key", apiKey)
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			log.Printf("[Gemini-Models] 请求失败: channel=%s, key=%s, url=%s, error=%v",
+				channelName, utils.MaskAPIKey(apiKey), url, err)
+			c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("Failed to fetch models: %v", err)})
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			log.Printf("[Gemini-Models] 读取响应失败: channel=%s, error=%v", channelName, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to read response: %v", err)})
+			return
+		}
+
+		log.Printf("[Gemini-Models] 上游响应: channel=%s, key=%s, status=%d, url=%s",
+			channelName, utils.MaskAPIKey(apiKey), resp.StatusCode, url)
+
+		// 非 200 直接透传
+		if resp.StatusCode != http.StatusOK {
+			c.Data(resp.StatusCode, "application/json", body)
+			return
+		}
+
+		// Gemini 返回 {"models": [{"name": "models/gemini-...", ...}]}
+		// 转换为 OpenAI 兼容格式 {"object": "list", "data": [{"id": "gemini-...", ...}]}
+		// 先检测是否包含 "models" 字段，若无则透传原始响应（如分页空结果或非标准格式）
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(body, &raw); err != nil || raw["models"] == nil {
+			if err != nil {
+				log.Printf("[Gemini-Models] 响应格式解析失败，透传原始响应: %v", err)
+			} else {
+				log.Printf("[Gemini-Models] 响应无 models 字段，透传原始响应")
+			}
+			c.Data(http.StatusOK, "application/json", body)
+			return
+		}
+
+		var geminiResp struct {
+			Models []struct {
+				Name string `json:"name"`
+			} `json:"models"`
+		}
+		if err := json.Unmarshal(body, &geminiResp); err != nil {
+			log.Printf("[Gemini-Models] 响应结构解析失败，透传原始响应: %v", err)
+			c.Data(http.StatusOK, "application/json", body)
+			return
+		}
+
+		type modelEntry struct {
+			ID     string `json:"id"`
+			Object string `json:"object"`
+		}
+		entries := make([]modelEntry, 0, len(geminiResp.Models))
+		for _, m := range geminiResp.Models {
+			// name 格式为 "models/gemini-1.5-pro"，取 "/" 后的部分作为 id
+			id := m.Name
+			if idx := strings.LastIndex(m.Name, "/"); idx >= 0 {
+				id = m.Name[idx+1:]
+			}
+			entries = append(entries, modelEntry{ID: id, Object: "model"})
+		}
+
+		converted, err := json.Marshal(map[string]any{
+			"object": "list",
+			"data":   entries,
+		})
+		if err != nil {
+			c.Data(http.StatusOK, "application/json", body)
+			return
+		}
+		c.Data(http.StatusOK, "application/json", converted)
 	}
 }
