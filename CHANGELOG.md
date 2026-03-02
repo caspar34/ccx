@@ -1,3 +1,9 @@
+## [v2.6.24] - 2026-03-02
+
+### 修复
+
+- **Dashboard 响应包含完整渠道配置字段** - `GetChannelDashboard` 返回值新增 `customHeaders`、`proxyUrl`、`supportedModels` 字段，确保前端展示 Dashboard 时能获取完整渠道信息
+
 ## [v2.6.23] - 2026-03-02
 
 ### 修复
