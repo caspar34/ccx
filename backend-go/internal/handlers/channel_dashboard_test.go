@@ -1,4 +1,4 @@
-package gemini
+package handlers
 
 import (
 	"encoding/json"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/BenedictKing/ccx/internal/config"
-	"github.com/BenedictKing/ccx/internal/handlers"
 	"github.com/BenedictKing/ccx/internal/metrics"
 	"github.com/BenedictKing/ccx/internal/scheduler"
 	"github.com/BenedictKing/ccx/internal/session"
@@ -18,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestGetDashboard_IncludesStripThoughtSignature(t *testing.T) {
+func TestGetChannelDashboard_Gemini_IncludesStripThoughtSignature(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	cfg := config.Config{
@@ -65,7 +64,7 @@ func TestGetDashboard_IncludesStripThoughtSignature(t *testing.T) {
 	sch := scheduler.NewChannelScheduler(cfgManager, messagesMetrics, responsesMetrics, geminiMetrics, chatMetrics, traceAffinity, urlManager)
 
 	r := gin.New()
-	r.GET("/messages/channels/dashboard", handlers.GetChannelDashboard(cfgManager, sch))
+	r.GET("/messages/channels/dashboard", GetChannelDashboard(cfgManager, sch))
 
 	req := httptest.NewRequest(http.MethodGet, "/messages/channels/dashboard?type=gemini", nil)
 	w := httptest.NewRecorder()
