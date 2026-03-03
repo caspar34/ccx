@@ -107,6 +107,51 @@ func TestGeminiHandleStreamResponse_MessageDeltaAlwaysContainsUsage(t *testing.T
 	}
 }
 
+// TestGeminiHandleStreamResponse_CachedContentTokenCountReducesInputTokens 验证当 cachedContentTokenCount
+// 出现在后续 chunk 时，input_tokens 应该正确减少（而不是保持之前较大的值）
+func TestGeminiHandleStreamResponse_CachedContentTokenCountReducesInputTokens(t *testing.T) {
+	// 模拟场景：先收到 promptTokenCount=100，后收到 promptTokenCount=100 + cachedContentTokenCount=80
+	// 期望最终 input_tokens = 100 - 80 = 20
+	body := strings.Join([]string{
+		`data: {"usageMetadata":{"promptTokenCount":100}}`,
+		`data: {"candidates":[{"content":{"parts":[{"text":"OK"}]},"finishReason":"STOP"}]}`,
+		`data: {"usageMetadata":{"promptTokenCount":100,"cachedContentTokenCount":80,"candidatesTokenCount":5}}`,
+		"",
+	}, "\n")
+
+	provider := &GeminiProvider{}
+	eventChan, errChan, err := provider.HandleStreamResponse(io.NopCloser(strings.NewReader(body)))
+	if err != nil {
+		t.Fatalf("HandleStreamResponse returned error: %v", err)
+	}
+
+	events := collectStreamEvents(eventChan)
+	select {
+	case streamErr := <-errChan:
+		if streamErr != nil {
+			t.Fatalf("unexpected stream error: %v", streamErr)
+		}
+	default:
+	}
+
+	messageDelta := extractMessageDelta(t, events)
+	usage, ok := messageDelta["usage"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("usage field missing in message_delta: %v", messageDelta)
+	}
+
+	inputTokens, _ := usage["input_tokens"].(float64)
+	outputTokens, _ := usage["output_tokens"].(float64)
+
+	// 关键断言：input_tokens 应该是 100 - 80 = 20，而不是 100
+	if int(inputTokens) != 20 {
+		t.Fatalf("expected input_tokens=20 (100-80 cached), got %v", inputTokens)
+	}
+	if int(outputTokens) != 5 {
+		t.Fatalf("expected output_tokens=5, got %v", outputTokens)
+	}
+}
+
 func TestGeminiHandleStreamResponse_SafetyFinishReasonMapsToEndTurn(t *testing.T) {
 	body := strings.Join([]string{
 		`data: {"candidates":[{"content":{"parts":[{"text":"blocked"}]},"finishReason":"SAFETY"}]}`,

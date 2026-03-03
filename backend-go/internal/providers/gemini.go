@@ -418,10 +418,10 @@ func (p *GeminiProvider) HandleStreamResponse(body io.ReadCloser) (<-chan string
 					outputTokens = 0
 				}
 
-				// usageMetadata 可能多次出现，保留最新的非下降值，避免回退。
-				if inputTokens > latestInputTokens {
-					latestInputTokens = inputTokens
-				}
+				// usageMetadata 可能多次出现：
+				// - inputTokens: 直接覆盖，因为后续 chunk 可能包含 cachedContentTokenCount 使值变小
+				// - outputTokens: 保持单调递增，因为输出 token 只会累加
+				latestInputTokens = inputTokens
 				if outputTokens > latestOutputTokens {
 					latestOutputTokens = outputTokens
 				}
