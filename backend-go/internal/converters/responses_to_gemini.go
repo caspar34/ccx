@@ -179,6 +179,10 @@ func responsesItemToGeminiContents(item types.ResponsesItem) []types.GeminiConte
 			if n, ok := contentMap["name"].(string); ok {
 				name = n
 			}
+			if name == "" {
+				// 兼容 Responses 顶层 function_call_output 使用 call_id 的格式
+				name, _ = contentMap["call_id"].(string)
+			}
 			if o := contentMap["output"]; o != nil {
 				output = o
 			}

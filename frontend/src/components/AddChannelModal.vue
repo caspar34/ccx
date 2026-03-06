@@ -704,6 +704,7 @@ import {
   isValidUrl as _isValidQuickInputUrl,
   parseQuickInput as parseQuickInputUtil
 } from '../utils/quickInputParser'
+import { buildExpectedRequestUrls } from '../utils/expectedRequestUrls'
 
 interface Props {
   show: boolean
@@ -966,62 +967,7 @@ const baseUrlHasError = computed(() => {
 
 // 详细模式所有 URL 的预期请求（支持多 BaseURL）
 const formExpectedRequestUrls = computed(() => {
-  if (!form.serviceType) return []
-
-  // 收集所有 URL
-  const urls: string[] = []
-  if (form.baseUrls && form.baseUrls.length > 0) {
-    urls.push(...form.baseUrls)
-  } else if (form.baseUrl) {
-    urls.push(form.baseUrl)
-  }
-
-  if (urls.length === 0) return []
-
-  // 根据 serviceType 确定端点
-  let endpoint = ''
-  if (props.channelType === 'responses') {
-    if (form.serviceType === 'responses') {
-      endpoint = '/responses'
-    } else if (form.serviceType === 'claude') {
-      endpoint = '/messages'
-    } else if (form.serviceType === 'gemini') {
-      endpoint = '/models/{model}:generateContent'
-    } else {
-      endpoint = '/chat/completions'
-    }
-  } else {
-    // messages, chat, gemini 渠道
-    if (form.serviceType === 'claude') {
-      endpoint = '/messages'
-    } else if (form.serviceType === 'gemini') {
-      endpoint = '/models/{model}:generateContent'
-    } else if (form.serviceType === 'responses') {
-      endpoint = '/responses'
-    } else {
-      endpoint = '/chat/completions'
-    }
-  }
-
-  // 为每个 URL 生成预期请求
-  return urls
-    .filter(url => url && isValidUrl(url.replace(/#$/, '')))
-    .map(rawUrl => {
-      let baseUrl = rawUrl.trim()
-      const skipVersion = baseUrl.endsWith('#')
-      if (skipVersion) {
-        baseUrl = baseUrl.slice(0, -1)
-      }
-      baseUrl = baseUrl.replace(/\/$/, '')
-
-      const hasVersion = /\/v\d+[a-z]*$/.test(baseUrl)
-
-      // Gemini 使用 /v1beta，其他使用 /v1
-      const versionPrefix = form.serviceType === 'gemini' ? '/v1beta' : '/v1'
-      const expectedUrl = hasVersion || skipVersion ? baseUrl + endpoint : baseUrl + versionPrefix + endpoint
-
-      return { baseUrl: rawUrl, expectedUrl }
-    })
+  return buildExpectedRequestUrls(props.channelType, form.serviceType, form.baseUrl, form.baseUrls)
 })
 
 // 处理快速添加提交
