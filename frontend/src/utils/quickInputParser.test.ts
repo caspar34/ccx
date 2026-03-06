@@ -356,13 +356,31 @@ describe('综合解析场景', () => {
     expect(result.detectedBaseUrl).toBe('https://api.example.com')
   })
 
-  it('应正确处理 JWT 格式的 key', () => {
-    const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U'
-    const input = `https://api.example.com ${jwt}`
+  it('应剔除 new-api 控制台路径', () => {
+    const input = 'https://stephecurry.asia/console/token sk-key1234567890'
     const result = parseQuickInput(input)
-    expect(result.detectedBaseUrl).toBe('https://api.example.com')
-    expect(result.detectedApiKeys).toEqual([jwt])
+    expect(result.detectedBaseUrl).toBe('https://stephecurry.asia')
   })
+
+  it('应剔除 console 下的 personal 路径', () => {
+    const input = 'https://ai.muapi.cn/console/personal sk-key1234567890'
+    const result = parseQuickInput(input)
+    expect(result.detectedBaseUrl).toBe('https://ai.muapi.cn')
+  })
+
+  it('应剔除 done hub 的 panel token 路径', () => {
+    const input = 'https://api.224442.xyz/panel/token sk-key1234567890'
+    const result = parseQuickInput(input)
+    expect(result.detectedBaseUrl).toBe('https://api.224442.xyz')
+  })
+
+  it('应剔除 sub2api 面板路径', () => {
+    const input = 'https://ai.qaq.al/dashboard https://ai.qaq.al/keys sk-key1234567890'
+    const result = parseQuickInput(input)
+    expect(result.detectedBaseUrl).toBe('https://ai.qaq.al')
+    expect(result.detectedBaseUrls).toEqual(['https://ai.qaq.al'])
+  })
+
 })
 
 describe('引号内容提取', () => {

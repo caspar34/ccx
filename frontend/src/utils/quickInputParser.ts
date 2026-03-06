@@ -182,6 +182,19 @@ const detectServiceTypeAndCleanUrl = (
         return { serviceType, cleanedUrl: result }
       }
     }
+
+    // 剔除常见第三方面板路径，仅保留 origin 作为 baseUrl
+    const dashboardPathPrefixes = [
+      '/console',
+      '/dashboard',
+      '/keys',
+      '/panel'
+    ]
+    if (dashboardPathPrefixes.some(prefix => path === prefix || path.startsWith(prefix + '/'))) {
+      let result = parsed.origin
+      if (url.endsWith('#')) result += '#'
+      return { serviceType: null, cleanedUrl: result }
+    }
   } catch {
     // 忽略解析错误
   }
