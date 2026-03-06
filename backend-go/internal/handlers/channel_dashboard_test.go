@@ -17,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestGetChannelDashboard_Gemini_IncludesStripThoughtSignature(t *testing.T) {
+func TestGetChannelDashboard_Gemini_IncludesAdvancedOptionFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	cfg := config.Config{
@@ -27,6 +27,9 @@ func TestGetChannelDashboard_Gemini_IncludesStripThoughtSignature(t *testing.T) 
 				ServiceType:           "gemini",
 				BaseURL:               "https://example.com",
 				APIKeys:               []string{"test-key"},
+				ReasoningMapping:      map[string]string{"gemini-2.5-pro": "high"},
+				TextVerbosity:         "medium",
+				FastMode:              true,
 				StripThoughtSignature: true,
 			},
 		},
@@ -94,5 +97,21 @@ func TestGetChannelDashboard_Gemini_IncludesStripThoughtSignature(t *testing.T) 
 	}
 	if strip != true {
 		t.Fatalf("stripThoughtSignature=%v, want=true", strip)
+	}
+
+	if got := resp.Channels[0]["textVerbosity"]; got != "medium" {
+		t.Fatalf("textVerbosity=%v, want=medium", got)
+	}
+
+	if got := resp.Channels[0]["fastMode"]; got != true {
+		t.Fatalf("fastMode=%v, want=true", got)
+	}
+
+	reasoning, ok := resp.Channels[0]["reasoningMapping"].(map[string]any)
+	if !ok {
+		t.Fatalf("reasoningMapping 类型=%T, want=map[string]any", resp.Channels[0]["reasoningMapping"])
+	}
+	if got := reasoning["gemini-2.5-pro"]; got != "high" {
+		t.Fatalf("reasoningMapping[gemini-2.5-pro]=%v, want=high", got)
 	}
 }
