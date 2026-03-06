@@ -198,7 +198,7 @@
                     <span class="text-caption text-primary">💡 点击目标模型输入框会自动获取上游支持的模型列表,每个 API Key 的检测状态会显示在密钥列表中</span>
                   </div>
 
-                  <v-row class="mb-2">
+                  <v-row v-if="supportsOpenAIAdvancedOptions" class="mb-2">
                     <v-col cols="12" md="6">
                       <v-select
                         v-model="form.textVerbosity"
@@ -208,7 +208,6 @@
                         density="comfortable"
                         hide-details
                         clearable
-                        :disabled="!supportsOpenAIAdvancedOptions"
                       />
                     </v-col>
                     <v-col cols="12" md="6">
@@ -222,7 +221,6 @@
                           color="primary"
                           hide-details
                           inset
-                          :disabled="!supportsOpenAIAdvancedOptions"
                         />
                       </div>
                     </v-col>
