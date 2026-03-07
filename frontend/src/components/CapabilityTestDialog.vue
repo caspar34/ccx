@@ -68,7 +68,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="test in result.tests" :key="test.protocol">
+              <tr v-for="test in sortedTests" :key="test.protocol">
                 <td>
                   <v-chip :color="getProtocolColor(test.protocol)" size="small" variant="tonal">
                     {{ getProtocolDisplayName(test.protocol) }}
@@ -157,7 +157,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { CapabilityTestResult } from '../services/api'
 
 interface Props {
@@ -217,6 +217,19 @@ const getSuccessfulProtocols = () => {
     .filter(t => t.success)
     .map(t => t.protocol)
 }
+
+// 协议显示顺序（与主界面 tab 顺序一致）
+const protocolOrder = ['messages', 'chat', 'responses', 'gemini']
+
+// 排序后的测试结果
+const sortedTests = computed(() => {
+  if (!result.value) return []
+  return [...result.value.tests].sort((a, b) => {
+    const indexA = protocolOrder.indexOf(a.protocol)
+    const indexB = protocolOrder.indexOf(b.protocol)
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB)
+  })
+})
 
 // 暴露方法供父组件调用
 const setLoading = () => {
