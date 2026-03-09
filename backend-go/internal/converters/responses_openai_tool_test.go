@@ -17,7 +17,7 @@ func TestResponsesToOpenAIChatMessages_ToolCall(t *testing.T) {
 	// 模拟 Responses tool_call
 	newInput := []interface{}{
 		map[string]interface{}{
-			"type": "text",
+			"type":    "text",
 			"content": "Search for Go tutorials",
 		},
 		map[string]interface{}{

@@ -31,6 +31,7 @@ type ClaudeContent struct {
 	ID           string        `json:"id,omitempty"`
 	Name         string        `json:"name,omitempty"`
 	Input        interface{}   `json:"input,omitempty"`
+	Content      interface{}   `json:"content,omitempty"` // tool_result 的内容字段
 	ToolUseID    string        `json:"tool_use_id,omitempty"`
 	CacheControl *CacheControl `json:"cache_control,omitempty"`
 }

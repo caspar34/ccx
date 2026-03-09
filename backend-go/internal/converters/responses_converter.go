@@ -33,7 +33,40 @@ func ResponsesToClaudeMessages(sess *session.Session, newInput interface{}, inst
 		return nil, "", err
 	}
 
+	// 3. 收集有效的 tool_use ID 和被跳过的 tool_call ID
+	validToolUseIDs := make(map[string]bool)
+	skippedToolUseIDs := make(map[string]bool)
+
 	for _, item := range newItems {
+		if item.Type == "tool_call" {
+			if item.ToolUse != nil {
+				validToolUseIDs[item.ToolUse.ID] = true
+			} else {
+				// 记录被跳过的 tool_call（缺少 ToolUse）
+				// 需要从 Content 中提取可能的 ID
+				if contentMap, ok := item.Content.(map[string]interface{}); ok {
+					if id, ok := contentMap["id"].(string); ok && id != "" {
+						skippedToolUseIDs[id] = true
+					}
+				}
+			}
+		}
+	}
+
+	// 4. 转换新输入，跳过与被跳过 tool_call 对应的 tool_result
+	for _, item := range newItems {
+		// 如果是 tool_result，检查是否对应被跳过的 tool_call
+		if item.Type == "tool_result" && len(skippedToolUseIDs) > 0 {
+			if contentMap, ok := item.Content.(map[string]interface{}); ok {
+				if toolUseID, _ := contentMap["tool_use_id"].(string); toolUseID != "" {
+					if skippedToolUseIDs[toolUseID] {
+						// 跳过与被跳过 tool_call 对应的 tool_result
+						continue
+					}
+				}
+			}
+		}
+
 		msg, err := responsesItemToClaudeMessage(item)
 		if err != nil {
 			return nil, "", fmt.Errorf("转换新消息失败: %w", err)
@@ -95,12 +128,50 @@ func responsesItemToClaudeMessage(item types.ResponsesItem) (*types.ClaudeMessag
 		}, nil
 
 	case "tool_call":
-		// 工具调用（暂时简化处理）
-		return nil, nil
+		// 工具调用：转换为 Claude assistant 消息，包含 tool_use 内容块
+		// 兼容性处理：历史消息中可能缺少 tool_use 字段，跳过而不是报错
+		if item.ToolUse == nil {
+			return nil, nil
+		}
+
+		return &types.ClaudeMessage{
+			Role: "assistant",
+			Content: []types.ClaudeContent{
+				{
+					Type:  "tool_use",
+					ID:    item.ToolUse.ID,
+					Name:  item.ToolUse.Name,
+					Input: item.ToolUse.Input,
+				},
+			},
+		}, nil
 
 	case "tool_result":
-		// 工具结果（暂时简化处理）
-		return nil, nil
+		// 工具结果：转换为 Claude user 消息，包含 tool_result 内容块
+		// 从 Content 中提取 tool_use_id 和 content
+		contentMap, ok := item.Content.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("tool_result 类型的 content 必须是 map[string]interface{}")
+		}
+
+		toolUseID, _ := contentMap["tool_use_id"].(string)
+		if toolUseID == "" {
+			return nil, fmt.Errorf("tool_result 缺少 tool_use_id")
+		}
+
+		// content 可能是 string 或其他类型
+		resultContent := contentMap["content"]
+
+		return &types.ClaudeMessage{
+			Role: "user",
+			Content: []types.ClaudeContent{
+				{
+					Type:      "tool_result",
+					ToolUseID: toolUseID,
+					Content:   resultContent,
+				},
+			},
+		}, nil
 
 	default:
 		return nil, fmt.Errorf("未知的 item type: %s", item.Type)
@@ -124,11 +195,25 @@ func ClaudeResponseToResponses(claudeResp map[string]interface{}, sessionID stri
 		}
 
 		blockType, _ := contentBlock["type"].(string)
-		if blockType == "text" {
+		switch blockType {
+		case "text":
 			text, _ := contentBlock["text"].(string)
 			output = append(output, types.ResponsesItem{
 				Type:    "text",
 				Content: text,
+			})
+		case "tool_use":
+			// 转换 tool_use 为 tool_call
+			id, _ := contentBlock["id"].(string)
+			name, _ := contentBlock["name"].(string)
+			input := contentBlock["input"]
+			output = append(output, types.ResponsesItem{
+				Type: "tool_call",
+				ToolUse: &types.ToolUse{
+					ID:    id,
+					Name:  name,
+					Input: input,
+				},
 			})
 		}
 	}
@@ -222,6 +307,64 @@ func responsesItemToOpenAIMessage(item types.ResponsesItem) map[string]interface
 		return map[string]interface{}{
 			"role":    role,
 			"content": contentStr,
+		}
+
+	case "tool_call":
+		// 工具调用：转换为 OpenAI assistant 消息，包含 tool_calls
+		if item.ToolUse == nil {
+			return nil
+		}
+
+		// 序列化 input 为 JSON 字符串
+		argsJSON, err := JSONMarshal(item.ToolUse.Input)
+		if err != nil {
+			return nil
+		}
+
+		return map[string]interface{}{
+			"role": "assistant",
+			"tool_calls": []map[string]interface{}{
+				{
+					"id":   item.ToolUse.ID,
+					"type": "function",
+					"function": map[string]interface{}{
+						"name":      item.ToolUse.Name,
+						"arguments": string(argsJSON),
+					},
+				},
+			},
+		}
+
+	case "tool_result":
+		// 工具结果：转换为 OpenAI tool 消息
+		contentMap, ok := item.Content.(map[string]interface{})
+		if !ok {
+			return nil
+		}
+
+		toolUseID, _ := contentMap["tool_use_id"].(string)
+		if toolUseID == "" {
+			return nil
+		}
+
+		// content 可能是 string 或其他类型
+		resultContent := contentMap["content"]
+		var contentStr string
+		if str, ok := resultContent.(string); ok {
+			contentStr = str
+		} else {
+			// 序列化为 JSON 字符串
+			contentJSON, err := JSONMarshal(resultContent)
+			if err != nil {
+				return nil
+			}
+			contentStr = string(contentJSON)
+		}
+
+		return map[string]interface{}{
+			"role":         "tool",
+			"tool_call_id": toolUseID,
+			"content":      contentStr,
 		}
 	}
 
@@ -341,6 +484,24 @@ func parseResponsesInput(input interface{}) ([]types.ResponsesItem, error) {
 					Type:    itemType,
 					Role:    role,
 					Content: itemMap, // 保留完整 map,包含 name/arguments/call_id/output 等字段
+				})
+			} else if itemType == "tool_call" {
+				// 解析 tool_use 字段
+				var toolUse *types.ToolUse
+				if toolUseMap, ok := itemMap["tool_use"].(map[string]interface{}); ok {
+					id, _ := toolUseMap["id"].(string)
+					name, _ := toolUseMap["name"].(string)
+					toolUse = &types.ToolUse{
+						ID:    id,
+						Name:  name,
+						Input: toolUseMap["input"],
+					}
+				}
+				items = append(items, types.ResponsesItem{
+					Type:    itemType,
+					Role:    role,
+					Content: content,
+					ToolUse: toolUse,
 				})
 			} else {
 				items = append(items, types.ResponsesItem{

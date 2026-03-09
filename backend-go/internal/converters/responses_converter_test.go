@@ -240,7 +240,7 @@ func TestResponsesToClaudeMessages_RoundtripShape(t *testing.T) {
 	// 模拟完整的工具调用流程
 	newInput := []interface{}{
 		map[string]interface{}{
-			"type": "text",
+			"type":    "text",
 			"content": "Please search for Go tutorials",
 		},
 		map[string]interface{}{
@@ -342,25 +342,27 @@ func TestClaudeResponseToResponses_TextOnlyRegression(t *testing.T) {
 	}
 }
 
-// TestResponsesToClaudeMessages_ToolCallMissingToolUse 测试缺少 tool_use 字段的错误处理
+// TestResponsesToClaudeMessages_ToolCallMissingToolUse 测试缺少 tool_use 字段的兼容性处理
 func TestResponsesToClaudeMessages_ToolCallMissingToolUse(t *testing.T) {
 	sess := &session.Session{
 		Messages: []types.ResponsesItem{},
 	}
 
-	// tool_call 但缺少 tool_use 字段
+	// tool_call 但缺少 tool_use 字段（历史消息场景）
 	newInput := []interface{}{
 		map[string]interface{}{
 			"type": "tool_call",
 		},
 	}
 
-	_, _, err := ResponsesToClaudeMessages(sess, newInput, "")
-	if err == nil {
-		t.Error("期望返回错误，但成功了")
+	messages, _, err := ResponsesToClaudeMessages(sess, newInput, "")
+	// 应该跳过而不是报错，保持向后兼容
+	if err != nil {
+		t.Errorf("不应该返回错误，应该跳过: %v", err)
 	}
-	if err.Error() != "转换新消息失败: tool_call 类型缺少 tool_use 字段" {
-		t.Errorf("错误信息不匹配: %v", err)
+	// 应该返回空消息列表（跳过了无效的 tool_call）
+	if len(messages) != 0 {
+		t.Errorf("期望返回 0 条消息（跳过无效 tool_call），实际 %d", len(messages))
 	}
 }
 

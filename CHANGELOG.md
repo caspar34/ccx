@@ -1,3 +1,23 @@
+## [Unreleased]
+
+### 修复
+
+- **Claude → Responses 转换中的 tool_use 处理 Bug** - 修复 Claude 上游转 Responses API 时工具调用信息丢失的问题
+  - 修复 `ClaudeResponseToResponses` 仅处理 `text` 类型，完全忽略 `tool_use` 的 Bug
+  - 实现 `responsesItemToClaudeMessage` 对 `tool_call` / `tool_result` 的真实转换（之前为占位实现）
+  - 实现 `responsesItemToOpenAIMessage` 对 `tool_call` / `tool_result` 的转换支持
+  - 补充 `ClaudeContent.Content` 字段以支持 `tool_result` 内容传递
+  - 修复 `parseResponsesInput` 解析 `tool_call` 时未填充 `ToolUse` 字段的问题
+  - **兼容性修复**：对历史消息中缺少 `tool_use` 的 `tool_call` 跳过而不是报错，避免多轮会话失败
+
+### 新增
+
+- **协议互转工具调用测试覆盖** - 补充所有缺失的协议间 tool 互转测试，新增 3 个测试文件共 16 个测试用例
+  - Gemini ↔ Claude 工具转换测试（`gemini_claude_tool_test.go`，6 个测试）
+  - Responses ↔ OpenAI 工具转换测试（`responses_openai_tool_test.go`，5 个测试）
+  - OpenAI ↔ Claude 工具转换测试（`openai_claude_tool_test.go`，5 个测试）
+  - 覆盖 function_call/tool_use/tool_calls 的双向转换、多工具调用、混合内容、往返验证等场景
+
 ## [v2.6.29] - 2026-03-09
 
 ### 优化
