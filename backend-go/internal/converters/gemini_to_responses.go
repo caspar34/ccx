@@ -54,6 +54,7 @@ func GeminiToResponsesRequest(geminiReq *types.GeminiRequest, modelName string) 
 		for _, tool := range geminiReq.Tools {
 			for _, fn := range tool.FunctionDeclarations {
 				responsesTool := map[string]interface{}{
+					"type": "function",
 					"name": fn.Name,
 				}
 				if fn.Description != "" {
@@ -116,15 +117,12 @@ func geminiContentToResponsesItems(content *types.GeminiContent) []types.Respons
 	for _, part := range content.Parts {
 		if part.FunctionCall != nil {
 			argsJSON, _ := JSONMarshal(part.FunctionCall.Args)
-			// 使用函数名作为 call_id，与 function_call_output 保持一致
 			items = append(items, types.ResponsesItem{
-				Type: "function_call",
-				Role: role,
-				Content: map[string]interface{}{
-					"call_id":   part.FunctionCall.Name,
-					"name":      part.FunctionCall.Name,
-					"arguments": string(argsJSON),
-				},
+				Type:      "function_call",
+				Role:      role,
+				CallID:    part.FunctionCall.Name,
+				Name:      part.FunctionCall.Name,
+				Arguments: string(argsJSON),
 			})
 		}
 	}
@@ -132,16 +130,11 @@ func geminiContentToResponsesItems(content *types.GeminiContent) []types.Respons
 	// 处理 function response
 	for _, part := range content.Parts {
 		if part.FunctionResponse != nil {
-			outputJSON, _ := JSONMarshal(part.FunctionResponse.Response)
-			outputStr := string(outputJSON)
-
 			items = append(items, types.ResponsesItem{
-				Type: "function_call_output",
-				Role: role,
-				Content: map[string]interface{}{
-					"call_id": part.FunctionResponse.Name,
-					"output":  outputStr,
-				},
+				Type:   "function_call_output",
+				Role:   role,
+				CallID: part.FunctionResponse.Name,
+				Output: part.FunctionResponse.Response,
 			})
 		}
 	}
@@ -205,6 +198,25 @@ func ResponsesResponseToGemini(responsesResp map[string]interface{}) (*types.Gem
 					Name:             name,
 					Args:             args,
 					ThoughtSignature: types.DummyThoughtSignature,
+				},
+			})
+
+		case "function_call_output":
+			name, _ := item["call_id"].(string)
+			output := item["output"]
+			if name == "" {
+				continue
+			}
+
+			response := map[string]interface{}{"result": output}
+			if outputMap, ok := output.(map[string]interface{}); ok {
+				response = outputMap
+			}
+
+			parts = append(parts, types.GeminiPart{
+				FunctionResponse: &types.GeminiFunctionResponse{
+					Name:     name,
+					Response: response,
 				},
 			})
 		}

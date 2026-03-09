@@ -27,44 +27,30 @@ func ResponsesToClaudeMessages(sess *session.Session, newInput interface{}, inst
 		}
 	}
 
-	// 2. 处理新输入
+	// 2. 处理新输入（统一在解析阶段完成 legacy tool_* → function_* 归一化）
 	newItems, err := parseResponsesInput(newInput)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// 3. 收集有效的 tool_use ID 和被跳过的 tool_call ID
-	validToolUseIDs := make(map[string]bool)
-	skippedToolUseIDs := make(map[string]bool)
-
+	// 3. 收集被跳过的 legacy tool_call ID，避免输出孤立的 tool_result/function_call_output。
+	skippedCallIDs := make(map[string]bool)
 	for _, item := range newItems {
-		if item.Type == "tool_call" {
-			if item.ToolUse != nil {
-				validToolUseIDs[item.ToolUse.ID] = true
-			} else {
-				// 记录被跳过的 tool_call（缺少 ToolUse）
-				// 需要从 Content 中提取可能的 ID
-				if contentMap, ok := item.Content.(map[string]interface{}); ok {
-					if id, ok := contentMap["id"].(string); ok && id != "" {
-						skippedToolUseIDs[id] = true
-					}
-				}
+		if item.Type == "tool_call" && item.ToolUse == nil {
+			callID := item.CallID
+			if callID == "" {
+				callID = item.ID
+			}
+			if callID != "" {
+				skippedCallIDs[callID] = true
 			}
 		}
 	}
 
-	// 4. 转换新输入，跳过与被跳过 tool_call 对应的 tool_result
+	// 4. 转换新输入，跳过与被跳过 tool_call 对应的结果项。
 	for _, item := range newItems {
-		// 如果是 tool_result，检查是否对应被跳过的 tool_call
-		if item.Type == "tool_result" && len(skippedToolUseIDs) > 0 {
-			if contentMap, ok := item.Content.(map[string]interface{}); ok {
-				if toolUseID, _ := contentMap["tool_use_id"].(string); toolUseID != "" {
-					if skippedToolUseIDs[toolUseID] {
-						// 跳过与被跳过 tool_call 对应的 tool_result
-						continue
-					}
-				}
-			}
+		if item.Type == "function_call_output" && item.CallID != "" && skippedCallIDs[item.CallID] {
+			continue
 		}
 
 		msg, err := responsesItemToClaudeMessage(item)
@@ -81,15 +67,19 @@ func ResponsesToClaudeMessages(sess *session.Session, newInput interface{}, inst
 
 // responsesItemToClaudeMessage 单个 ResponsesItem 转换为 Claude Message
 func responsesItemToClaudeMessage(item types.ResponsesItem) (*types.ClaudeMessage, error) {
+	item = types.NormalizeResponsesItem(item)
+
+	if item.Type == "tool_call" {
+		return nil, nil
+	}
+	if item.Type == "tool_result" {
+		return nil, fmt.Errorf("tool_result 缺少 tool_use_id")
+	}
+
 	switch item.Type {
 	case "message":
 		// 新格式：嵌套结构（type=message, role=user/assistant, content=[]ContentBlock）
-		role := item.Role
-		if role == "" {
-			role = "user" // 默认为 user
-		}
-
-		contentText := extractTextFromContent(item.Content)
+		role, contentText := resolveResponsesTextItem(item)
 		if contentText == "" {
 			return nil, nil // 空内容，跳过
 		}
@@ -106,15 +96,9 @@ func responsesItemToClaudeMessage(item types.ResponsesItem) (*types.ClaudeMessag
 
 	case "text":
 		// 旧格式：简单 string（向后兼容）
-		contentStr := extractTextFromContent(item.Content)
+		role, contentStr := resolveResponsesTextItem(item)
 		if contentStr == "" {
 			return nil, fmt.Errorf("text 类型的 content 不能为空")
-		}
-
-		// 使用 item.Role（如果存在），否则默认为 user
-		role := "user"
-		if item.Role != "" {
-			role = item.Role
 		}
 
 		return &types.ClaudeMessage{
@@ -127,50 +111,35 @@ func responsesItemToClaudeMessage(item types.ResponsesItem) (*types.ClaudeMessag
 			},
 		}, nil
 
-	case "tool_call":
-		// 工具调用：转换为 Claude assistant 消息，包含 tool_use 内容块
-		// 兼容性处理：历史消息中可能缺少 tool_use 字段，跳过而不是报错
-		if item.ToolUse == nil {
-			return nil, nil
+	case "function_call":
+		callID, name, arguments, err := resolveFunctionCallItem(item)
+		if err != nil {
+			return nil, err
 		}
 
 		return &types.ClaudeMessage{
 			Role: "assistant",
-			Content: []types.ClaudeContent{
-				{
-					Type:  "tool_use",
-					ID:    item.ToolUse.ID,
-					Name:  item.ToolUse.Name,
-					Input: item.ToolUse.Input,
-				},
-			},
+			Content: []types.ClaudeContent{{
+				Type:  "tool_use",
+				ID:    callID,
+				Name:  name,
+				Input: parseFunctionCallArguments(arguments),
+			}},
 		}, nil
 
-	case "tool_result":
-		// 工具结果：转换为 Claude user 消息，包含 tool_result 内容块
-		// 从 Content 中提取 tool_use_id 和 content
-		contentMap, ok := item.Content.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("tool_result 类型的 content 必须是 map[string]interface{}")
+	case "function_call_output":
+		callID, output, err := resolveFunctionCallOutputItem(item)
+		if err != nil {
+			return nil, err
 		}
-
-		toolUseID, _ := contentMap["tool_use_id"].(string)
-		if toolUseID == "" {
-			return nil, fmt.Errorf("tool_result 缺少 tool_use_id")
-		}
-
-		// content 可能是 string 或其他类型
-		resultContent := contentMap["content"]
 
 		return &types.ClaudeMessage{
 			Role: "user",
-			Content: []types.ClaudeContent{
-				{
-					Type:      "tool_result",
-					ToolUseID: toolUseID,
-					Content:   resultContent,
-				},
-			},
+			Content: []types.ClaudeContent{{
+				Type:      "tool_result",
+				ToolUseID: callID,
+				Content:   output,
+			}},
 		}, nil
 
 	default:
@@ -203,17 +172,26 @@ func ClaudeResponseToResponses(claudeResp map[string]interface{}, sessionID stri
 				Content: text,
 			})
 		case "tool_use":
-			// 转换 tool_use 为 tool_call
 			id, _ := contentBlock["id"].(string)
 			name, _ := contentBlock["name"].(string)
-			input := contentBlock["input"]
+			arguments := ""
+			if input, ok := contentBlock["input"]; ok {
+				if argsJSON, err := JSONMarshal(input); err == nil {
+					arguments = string(argsJSON)
+				}
+			}
 			output = append(output, types.ResponsesItem{
-				Type: "tool_call",
-				ToolUse: &types.ToolUse{
-					ID:    id,
-					Name:  name,
-					Input: input,
-				},
+				Type:      "function_call",
+				CallID:    id,
+				Name:      name,
+				Arguments: arguments,
+			})
+		case "tool_result":
+			toolUseID, _ := contentBlock["tool_use_id"].(string)
+			output = append(output, types.ResponsesItem{
+				Type:   "function_call_output",
+				CallID: toolUseID,
+				Output: contentBlock["content"],
 			})
 		}
 	}
@@ -274,15 +252,16 @@ func ResponsesToOpenAIChatMessages(sess *session.Session, newInput interface{}, 
 
 // responsesItemToOpenAIMessage 单个 ResponsesItem 转换为 OpenAI Message
 func responsesItemToOpenAIMessage(item types.ResponsesItem) map[string]interface{} {
+	item = types.NormalizeResponsesItem(item)
+
+	if item.Type == "tool_call" || item.Type == "tool_result" {
+		return nil
+	}
+
 	switch item.Type {
 	case "message":
 		// 新格式：嵌套结构
-		role := item.Role
-		if role == "" {
-			role = "user"
-		}
-
-		contentText := extractTextFromContent(item.Content)
+		role, contentText := resolveResponsesTextItem(item)
 		if contentText == "" {
 			return nil
 		}
@@ -294,14 +273,9 @@ func responsesItemToOpenAIMessage(item types.ResponsesItem) map[string]interface
 
 	case "text":
 		// 旧格式：简单 string
-		contentStr := extractTextFromContent(item.Content)
+		role, contentStr := resolveResponsesTextItem(item)
 		if contentStr == "" {
 			return nil
-		}
-
-		role := "user"
-		if item.Role != "" {
-			role = item.Role
 		}
 
 		return map[string]interface{}{
@@ -309,52 +283,37 @@ func responsesItemToOpenAIMessage(item types.ResponsesItem) map[string]interface
 			"content": contentStr,
 		}
 
-	case "tool_call":
-		// 工具调用：转换为 OpenAI assistant 消息，包含 tool_calls
-		if item.ToolUse == nil {
+	case "function_call":
+		callID, name, arguments, err := resolveFunctionCallItem(item)
+		if err != nil {
 			return nil
 		}
+		return map[string]interface{}{
+			"role": "assistant",
+			"tool_calls": []map[string]interface{}{{
+				"id":   callID,
+				"type": "function",
+				"function": map[string]interface{}{
+					"name":      name,
+					"arguments": arguments,
+				},
+			}},
+		}
 
-		// 序列化 input 为 JSON 字符串
-		argsJSON, err := JSONMarshal(item.ToolUse.Input)
+	case "function_call_output":
+		callID, output, err := resolveFunctionCallOutputItem(item)
 		if err != nil {
 			return nil
 		}
 
-		return map[string]interface{}{
-			"role": "assistant",
-			"tool_calls": []map[string]interface{}{
-				{
-					"id":   item.ToolUse.ID,
-					"type": "function",
-					"function": map[string]interface{}{
-						"name":      item.ToolUse.Name,
-						"arguments": string(argsJSON),
-					},
-				},
-			},
-		}
-
-	case "tool_result":
-		// 工具结果：转换为 OpenAI tool 消息
-		contentMap, ok := item.Content.(map[string]interface{})
-		if !ok {
-			return nil
-		}
-
-		toolUseID, _ := contentMap["tool_use_id"].(string)
-		if toolUseID == "" {
-			return nil
-		}
-
-		// content 可能是 string 或其他类型
-		resultContent := contentMap["content"]
-		var contentStr string
-		if str, ok := resultContent.(string); ok {
-			contentStr = str
-		} else {
-			// 序列化为 JSON 字符串
-			contentJSON, err := JSONMarshal(resultContent)
+		contentStr := ""
+		switch output := output.(type) {
+		case string:
+			contentStr = output
+		case nil:
+			contentStr = ""
+		default:
+			contentJSON, err := JSONMarshal(output)
 			if err != nil {
 				return nil
 			}
@@ -363,7 +322,7 @@ func responsesItemToOpenAIMessage(item types.ResponsesItem) map[string]interface
 
 		return map[string]interface{}{
 			"role":         "tool",
-			"tool_call_id": toolUseID,
+			"tool_call_id": callID,
 			"content":      contentStr,
 		}
 	}
@@ -386,10 +345,35 @@ func OpenAIChatResponseToResponses(openaiResp map[string]interface{}, sessionID 
 		if ok {
 			message, _ := choice["message"].(map[string]interface{})
 			content, _ := message["content"].(string)
-			output = append(output, types.ResponsesItem{
-				Type:    "text",
-				Content: content,
-			})
+			if content != "" {
+				output = append(output, types.ResponsesItem{
+					Type: "message",
+					Role: "assistant",
+					Content: []types.ContentBlock{{
+						Type: "output_text",
+						Text: content,
+					}},
+				})
+			}
+			if toolCalls, ok := message["tool_calls"].([]interface{}); ok {
+				for _, rawToolCall := range toolCalls {
+					toolCall, ok := rawToolCall.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					callID, _ := toolCall["id"].(string)
+					function, _ := toolCall["function"].(map[string]interface{})
+					name, _ := function["name"].(string)
+					arguments, _ := function["arguments"].(string)
+					output = append(output, types.ResponsesItem{
+						Type:      "function_call",
+						Status:    "completed",
+						CallID:    callID,
+						Name:      name,
+						Arguments: arguments,
+					})
+				}
+			}
 		}
 	}
 
@@ -454,72 +438,7 @@ func extractTextFromContent(content interface{}) string {
 
 // parseResponsesInput 解析 input 字段（可能是 string 或 []ResponsesItem）
 func parseResponsesInput(input interface{}) ([]types.ResponsesItem, error) {
-	switch v := input.(type) {
-	case string:
-		// 简单文本输入
-		return []types.ResponsesItem{
-			{
-				Type:    "text",
-				Content: v,
-			},
-		}, nil
-
-	case []interface{}:
-		// 数组输入
-		items := []types.ResponsesItem{}
-		for _, item := range v {
-			itemMap, ok := item.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			itemType, _ := itemMap["type"].(string)
-			content := itemMap["content"]
-			role, _ := itemMap["role"].(string)
-
-			// 对于 function_call 和 function_call_output,保留完整的 itemMap 作为 Content
-			// 这样 responsesItemToGeminiContents 可以从 Content 中读取所有字段
-			if itemType == "function_call" || itemType == "function_call_output" {
-				items = append(items, types.ResponsesItem{
-					Type:    itemType,
-					Role:    role,
-					Content: itemMap, // 保留完整 map,包含 name/arguments/call_id/output 等字段
-				})
-			} else if itemType == "tool_call" {
-				// 解析 tool_use 字段
-				var toolUse *types.ToolUse
-				if toolUseMap, ok := itemMap["tool_use"].(map[string]interface{}); ok {
-					id, _ := toolUseMap["id"].(string)
-					name, _ := toolUseMap["name"].(string)
-					toolUse = &types.ToolUse{
-						ID:    id,
-						Name:  name,
-						Input: toolUseMap["input"],
-					}
-				}
-				items = append(items, types.ResponsesItem{
-					Type:    itemType,
-					Role:    role,
-					Content: content,
-					ToolUse: toolUse,
-				})
-			} else {
-				items = append(items, types.ResponsesItem{
-					Type:    itemType,
-					Role:    role,
-					Content: content,
-				})
-			}
-		}
-		return items, nil
-
-	case []types.ResponsesItem:
-		// 已经是正确类型
-		return v, nil
-
-	default:
-		return nil, fmt.Errorf("不支持的 input 类型: %T", input)
-	}
+	return types.ParseResponsesInput(input)
 }
 
 // generateResponseID 生成响应ID

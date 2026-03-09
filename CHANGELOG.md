@@ -2,14 +2,15 @@
 
 ### 修复
 
-- **Claude → Responses 转换中的 tool_use 处理 Bug** - 修复 Claude 上游转 Responses API 时工具调用信息丢失的问题
-  - 修复 `ClaudeResponseToResponses` 仅处理 `text` 类型，完全忽略 `tool_use` 的 Bug
-  - 实现 `responsesItemToClaudeMessage` 对 `tool_call` / `tool_result` 的真实转换（之前为占位实现）
-  - 实现 `responsesItemToOpenAIMessage` 对 `tool_call` / `tool_result` 的转换支持
-  - 补充 `ClaudeContent.Content` 字段以支持 `tool_result` 内容传递
-  - 修复 `parseResponsesInput` 解析 `tool_call` 时未填充 `ToolUse` 字段的问题
-  - **兼容性修复**：对历史消息中缺少 `tool_use` 的 `tool_call` 跳过而不是报错，避免多轮会话失败
-  - **修复 Claude Messages → Responses 工具定义转换** - 修复 `providers/responses.go:204` 构造 tool 时缺少 `type: "function"` 字段，导致上游报错 "Unsupported tool type: None"
+- **修复工具调用协议转换中的两个 P2 级别 Bug**
+  - 修复空 tool input 生成非法 JSON 参数问题：`marshalJSONString` 对 `nil` 返回 `"{}"` 而非空字符串，避免上游函数调用请求解析失败
+  - 修复 Gemini 同名并行函数调用产生重复 tool_call_id 问题：使用 `函数名_索引` 格式生成唯一 ID，确保 tool result 能正确关联到具体调用
+- **Responses API 工具调用与工具定义互转补全** - 修复 Responses 协议在 Claude / OpenAI Chat / Gemini 之间转换时 function tools、function_call、function_call_output 字段丢失或格式不一致的问题
+  - 为 `ResponsesRequest` 补充 `tools`、`tool_choice`、`parallel_tool_calls`、`max_output_tokens` 字段，并统一映射到各上游请求
+  - 新增 `responses_tools.go` 提取工具定义转换逻辑，统一生成 Claude/OpenAI/Gemini 所需的函数工具格式
+  - 修复 `parseResponsesInput` / `parseInputToItems` 对 `function_call` 与 `function_call_output` 的字段保留，避免多轮工具链路断裂
+  - 修复 Gemini / OpenAI Chat / Claude 响应转 Responses 时 `call_id`、`name`、`arguments`、`output` 的结构化映射
+  - 补充转换器与 handler 单测，覆盖工具定义透传、function_call/function_call_output 往返与 handler 解析场景
 
 ### 新增
 

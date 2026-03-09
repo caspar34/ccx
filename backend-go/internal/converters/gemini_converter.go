@@ -353,7 +353,7 @@ func geminiContentToClaudeMessage(content *types.GeminiContent) (map[string]inte
 
 	claudeContent := []map[string]interface{}{}
 
-	for i, part := range content.Parts {
+	for _, part := range content.Parts {
 		if part.Text != "" {
 			claudeContent = append(claudeContent, map[string]interface{}{
 				"type": "text",
@@ -375,9 +375,13 @@ func geminiContentToClaudeMessage(content *types.GeminiContent) (map[string]inte
 
 		if part.FunctionCall != nil {
 			// 工具调用
+			toolUseID := part.FunctionCall.Name
+			if toolUseID == "" {
+				continue
+			}
 			claudeContent = append(claudeContent, map[string]interface{}{
 				"type":  "tool_use",
-				"id":    fmt.Sprintf("toolu_%d", i),
+				"id":    toolUseID,
 				"name":  part.FunctionCall.Name,
 				"input": part.FunctionCall.Args,
 			})
@@ -426,18 +430,23 @@ func geminiContentToOpenAIMessage(content *types.GeminiContent) (map[string]inte
 	var toolResponseName string
 	var toolResponseContent interface{}
 
-	for i, part := range content.Parts {
+	for idx, part := range content.Parts {
 		if part.Text != "" {
 			textParts = append(textParts, part.Text)
 		}
 
 		if part.FunctionCall != nil {
+			functionName := part.FunctionCall.Name
+			if functionName == "" {
+				continue
+			}
+			toolCallID := fmt.Sprintf("%s_%d", functionName, idx)
 			argsJSON, _ := JSONMarshal(part.FunctionCall.Args)
 			toolCalls = append(toolCalls, map[string]interface{}{
-				"id":   fmt.Sprintf("call_%d", i),
+				"id":   toolCallID,
 				"type": "function",
 				"function": map[string]interface{}{
-					"name":      part.FunctionCall.Name,
+					"name":      functionName,
 					"arguments": string(argsJSON),
 				},
 			})

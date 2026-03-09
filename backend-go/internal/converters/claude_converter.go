@@ -43,6 +43,11 @@ func (c *ClaudeConverter) ToProviderRequest(sess *session.Session, req *types.Re
 	if req.Stop != nil {
 		claudeReq["stop_sequences"] = req.Stop // Claude 使用 stop_sequences
 	}
+	if len(req.Tools) > 0 {
+		if tools := responsesToolsToClaude(req.Tools); len(tools) > 0 {
+			claudeReq["tools"] = tools
+		}
+	}
 
 	return claudeReq, nil
 }

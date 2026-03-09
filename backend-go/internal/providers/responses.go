@@ -137,16 +137,26 @@ func (p *ResponsesProvider) buildResponsesRequestFromClaude(bodyBytes []byte, up
 
 	input := make([]map[string]interface{}, 0, len(claudeReq.Messages))
 	for _, msg := range claudeReq.Messages {
-		item := map[string]interface{}{
-			"type": "message",
-			"role": normalizeRole(msg.Role),
-		}
-
+		role := normalizeRole(msg.Role)
 		contentBlocks := make([]map[string]interface{}, 0)
+		flushMessage := func() {
+			if len(contentBlocks) == 0 {
+				return
+			}
+			input = append(input, map[string]interface{}{
+				"type":    "message",
+				"role":    role,
+				"content": contentBlocks,
+			})
+			contentBlocks = make([]map[string]interface{}, 0)
+		}
 		switch content := msg.Content.(type) {
 		case string:
 			if content != "" {
-				contentBlocks = append(contentBlocks, map[string]interface{}{"type": "input_text", "text": content})
+				contentBlocks = append(contentBlocks, map[string]interface{}{
+					"type": responsesTextContentType(role),
+					"text": content,
+				})
 			}
 		case []interface{}:
 			for _, rawBlock := range content {
@@ -157,9 +167,13 @@ func (p *ResponsesProvider) buildResponsesRequestFromClaude(bodyBytes []byte, up
 				switch block["type"] {
 				case "text":
 					if text, ok := block["text"].(string); ok && text != "" {
-						contentBlocks = append(contentBlocks, map[string]interface{}{"type": "input_text", "text": text})
+						contentBlocks = append(contentBlocks, map[string]interface{}{
+							"type": responsesTextContentType(role),
+							"text": text,
+						})
 					}
 				case "tool_use":
+					flushMessage()
 					arguments, _ := utils.MarshalJSONNoEscape(block["input"])
 					input = append(input, map[string]interface{}{
 						"type":      "function_call",
@@ -168,6 +182,7 @@ func (p *ResponsesProvider) buildResponsesRequestFromClaude(bodyBytes []byte, up
 						"arguments": string(arguments),
 					})
 				case "tool_result":
+					flushMessage()
 					resultText := extractClaudeToolResult(block["content"])
 					input = append(input, map[string]interface{}{
 						"type":    "function_call_output",
@@ -178,10 +193,7 @@ func (p *ResponsesProvider) buildResponsesRequestFromClaude(bodyBytes []byte, up
 			}
 		}
 
-		if len(contentBlocks) > 0 {
-			item["content"] = contentBlocks
-			input = append(input, item)
-		}
+		flushMessage()
 	}
 
 	responsesReq := map[string]interface{}{
@@ -214,6 +226,13 @@ func (p *ResponsesProvider) buildResponsesRequestFromClaude(bodyBytes []byte, up
 		responsesReq["tools"] = tools
 	}
 	return responsesReq, nil
+}
+
+func responsesTextContentType(role string) string {
+	if role == "assistant" {
+		return "output_text"
+	}
+	return "input_text"
 }
 
 func extractClaudeToolResult(content interface{}) string {

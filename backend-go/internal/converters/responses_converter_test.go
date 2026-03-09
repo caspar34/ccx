@@ -1,6 +1,7 @@
 package converters
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/BenedictKing/ccx/internal/session"
@@ -37,40 +38,65 @@ func TestClaudeResponseToResponses_ToolUse(t *testing.T) {
 		t.Fatalf("转换失败: %v", err)
 	}
 
-	// 验证输出包含 text 和 tool_call
 	if len(result.Output) != 2 {
 		t.Fatalf("期望 2 个输出项，实际 %d", len(result.Output))
 	}
-
-	// 验证 text 项
 	if result.Output[0].Type != "text" {
 		t.Errorf("第一项类型期望 'text'，实际 '%s'", result.Output[0].Type)
 	}
-	if result.Output[0].Content != "Let me search for that information." {
-		t.Errorf("text 内容不匹配")
+	if result.Output[1].Type != "function_call" {
+		t.Fatalf("第二项类型期望 'function_call'，实际 '%s'", result.Output[1].Type)
+	}
+	if result.Output[1].CallID != "toolu_abc123" {
+		t.Errorf("call_id 期望 'toolu_abc123'，实际 '%s'", result.Output[1].CallID)
+	}
+	if result.Output[1].Name != "web_search" {
+		t.Errorf("name 期望 'web_search'，实际 '%s'", result.Output[1].Name)
 	}
 
-	// 验证 tool_call 项
-	if result.Output[1].Type != "tool_call" {
-		t.Errorf("第二项类型期望 'tool_call'，实际 '%s'", result.Output[1].Type)
+	var args map[string]interface{}
+	if err := json.Unmarshal([]byte(result.Output[1].Arguments), &args); err != nil {
+		t.Fatalf("arguments 反序列化失败: %v", err)
 	}
-	if result.Output[1].ToolUse == nil {
-		t.Fatal("tool_call 缺少 ToolUse 字段")
+	if args["query"] != "golang best practices" {
+		t.Errorf("arguments.query 不匹配")
 	}
-	if result.Output[1].ToolUse.ID != "toolu_abc123" {
-		t.Errorf("tool_use.id 期望 'toolu_abc123'，实际 '%s'", result.Output[1].ToolUse.ID)
-	}
-	if result.Output[1].ToolUse.Name != "web_search" {
-		t.Errorf("tool_use.name 期望 'web_search'，实际 '%s'", result.Output[1].ToolUse.Name)
+}
+
+func TestClaudeResponseToResponses_ToolResult(t *testing.T) {
+	claudeResp := map[string]interface{}{
+		"id":    "msg_124",
+		"model": "claude-3-5-sonnet-20241022",
+		"content": []interface{}{
+			map[string]interface{}{
+				"type":        "tool_result",
+				"tool_use_id": "toolu_abc123",
+				"content": map[string]interface{}{
+					"temperature": 72,
+				},
+			},
+		},
 	}
 
-	// 验证 input 字段
-	inputMap, ok := result.Output[1].ToolUse.Input.(map[string]interface{})
+	result, err := ClaudeResponseToResponses(claudeResp, "session_124")
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	if len(result.Output) != 1 {
+		t.Fatalf("期望 1 个输出项，实际 %d", len(result.Output))
+	}
+	if result.Output[0].Type != "function_call_output" {
+		t.Fatalf("类型期望 'function_call_output'，实际 '%s'", result.Output[0].Type)
+	}
+	if result.Output[0].CallID != "toolu_abc123" {
+		t.Fatalf("call_id 期望 'toolu_abc123'，实际 '%s'", result.Output[0].CallID)
+	}
+	outputMap, ok := result.Output[0].Output.(map[string]interface{})
 	if !ok {
-		t.Fatal("tool_use.input 类型错误")
+		t.Fatalf("output 类型错误: %#v", result.Output[0].Output)
 	}
-	if inputMap["query"] != "golang best practices" {
-		t.Errorf("tool_use.input.query 不匹配")
+	if outputMap["temperature"] != 72 {
+		t.Fatalf("temperature 不匹配: %#v", outputMap)
 	}
 }
 
@@ -133,6 +159,31 @@ func TestResponsesToClaudeMessages_ToolCall(t *testing.T) {
 	}
 	if inputMap["location"] != "San Francisco" {
 		t.Errorf("tool_use.input.location 不匹配")
+	}
+}
+
+func TestResponsesToClaudeMessages_FunctionCall(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	newInput := []interface{}{
+		map[string]interface{}{
+			"type":      "function_call",
+			"call_id":   "call_123",
+			"name":      "get_weather",
+			"arguments": `{"location":"NYC"}`,
+		},
+	}
+
+	messages, _, err := ResponsesToClaudeMessages(sess, newInput, "")
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("期望 1 条消息，实际 %d", len(messages))
+	}
+	content := messages[0].Content.([]types.ClaudeContent)
+	if content[0].Type != "tool_use" || content[0].ID != "call_123" || content[0].Name != "get_weather" {
+		t.Fatalf("function_call 转换结果不正确: %#v", content[0])
 	}
 }
 
@@ -366,7 +417,128 @@ func TestResponsesToClaudeMessages_ToolCallMissingToolUse(t *testing.T) {
 	}
 }
 
+func TestResponsesToClaudeMessages_SkipsLegacyToolResultForSkippedToolCall(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	newInput := []interface{}{
+		map[string]interface{}{
+			"type": "tool_call",
+			"id":   "toolu_missing",
+		},
+		map[string]interface{}{
+			"type": "tool_result",
+			"content": map[string]interface{}{
+				"tool_use_id": "toolu_missing",
+				"content":     "should be skipped",
+			},
+		},
+	}
+
+	messages, _, err := ResponsesToClaudeMessages(sess, newInput, "")
+	if err != nil {
+		t.Fatalf("不应该返回错误: %v", err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("期望跳过配对的 legacy tool_result，实际得到 %d 条消息", len(messages))
+	}
+}
+
 // TestResponsesToClaudeMessages_ToolResultMissingToolUseID 测试缺少 tool_use_id 的错误处理
+func TestResponsesToClaudeMessages_NormalizesLegacySessionMessages(t *testing.T) {
+	sess := &session.Session{
+		Messages: []types.ResponsesItem{
+			{
+				Type: "tool_call",
+				ToolUse: &types.ToolUse{
+					ID:   "toolu_hist",
+					Name: "get_weather",
+					Input: map[string]interface{}{
+						"location": "Berlin",
+					},
+				},
+			},
+			{
+				Type: "tool_result",
+				Content: map[string]interface{}{
+					"tool_use_id": "toolu_hist",
+					"content":     map[string]interface{}{"temperature": 18},
+				},
+			},
+		},
+	}
+
+	messages, _, err := ResponsesToClaudeMessages(sess, []interface{}{}, "")
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("期望 2 条历史消息，实际 %d", len(messages))
+	}
+	if messages[0].Role != "assistant" || messages[1].Role != "user" {
+		t.Fatalf("历史消息角色不正确: %#v", messages)
+	}
+	content0 := messages[0].Content.([]types.ClaudeContent)
+	if content0[0].Type != "tool_use" || content0[0].ID != "toolu_hist" || content0[0].Name != "get_weather" {
+		t.Fatalf("历史 tool_call 未正确归一化: %#v", content0[0])
+	}
+	content1 := messages[1].Content.([]types.ClaudeContent)
+	if content1[0].Type != "tool_result" || content1[0].ToolUseID != "toolu_hist" {
+		t.Fatalf("历史 tool_result 未正确归一化: %#v", content1[0])
+	}
+}
+
+func TestResponsesToClaudeMessages_FunctionCallMissingName(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	_, _, err := ResponsesToClaudeMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":      "function_call",
+			"call_id":   "call_1",
+			"arguments": `{"location":"Tokyo"}`,
+		},
+	}, "")
+	if err == nil {
+		t.Fatal("expected error for missing name")
+	}
+	if err.Error() != "转换新消息失败: function_call 缺少 name" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResponsesToClaudeMessages_FunctionCallOutputMissingCallIDErrorMessageStable(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	_, _, err := ResponsesToClaudeMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":   "function_call_output",
+			"output": "Sunny",
+		},
+	}, "")
+	if err == nil {
+		t.Fatal("expected error for missing call_id")
+	}
+	if err.Error() != "转换新消息失败: function_call_output 缺少 call_id" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResponsesToClaudeMessages_FunctionCallOutputMissingCallID(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	_, _, err := ResponsesToClaudeMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":   "function_call_output",
+			"output": "Sunny",
+		},
+	}, "")
+	if err == nil {
+		t.Fatal("expected error for missing call_id")
+	}
+	if err.Error() != "转换新消息失败: function_call_output 缺少 call_id" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestResponsesToClaudeMessages_ToolResultMissingToolUseID(t *testing.T) {
 	sess := &session.Session{
 		Messages: []types.ResponsesItem{},
@@ -388,5 +560,27 @@ func TestResponsesToClaudeMessages_ToolResultMissingToolUseID(t *testing.T) {
 	}
 	if err.Error() != "转换新消息失败: tool_result 缺少 tool_use_id" {
 		t.Errorf("错误信息不匹配: %v", err)
+	}
+}
+
+func TestResponsesToClaudeMessages_FunctionCallDefaultsCallIDToName(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	messages, _, err := ResponsesToClaudeMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":      "function_call",
+			"name":      "get_weather",
+			"arguments": `{"location":"Tokyo"}`,
+		},
+	}, "")
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("期望 1 条消息，实际 %d", len(messages))
+	}
+	content := messages[0].Content.([]types.ClaudeContent)
+	if content[0].ID != "get_weather" {
+		t.Fatalf("默认 call_id 应回退到 name，实际 %#v", content[0])
 	}
 }

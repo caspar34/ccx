@@ -69,6 +69,16 @@ func TestResponsesProvider_BuildResponsesRequestFromClaude(t *testing.T) {
 	if input[0]["type"] != "message" {
 		t.Fatalf("input[0].type = %v, want message", input[0]["type"])
 	}
+	content0, ok := input[0]["content"].([]map[string]interface{})
+	if !ok {
+		b, _ := json.Marshal(input[0]["content"])
+		if err := json.Unmarshal(b, &content0); err != nil {
+			t.Fatalf("input[0].content decode err: %v", err)
+		}
+	}
+	if len(content0) != 1 || content0[0]["type"] != "input_text" {
+		t.Fatalf("input[0].content = %#v, want single input_text block", content0)
+	}
 	if input[1]["type"] != "function_call" {
 		t.Fatalf("input[1].type = %v, want function_call", input[1]["type"])
 	}
@@ -96,6 +106,81 @@ func TestResponsesProvider_BuildResponsesRequestFromClaude(t *testing.T) {
 	if tools[0]["parameters"] == nil {
 		t.Fatalf("tools[0][\"parameters\"] is nil, want non-nil")
 	}
+}
+
+func TestResponsesProvider_BuildResponsesRequestFromClaude_AssistantTextUsesOutputText(t *testing.T) {
+	provider := &ResponsesProvider{}
+	upstream := &config.UpstreamConfig{
+		ServiceType: "responses",
+	}
+
+	body := []byte(`{
+		"model":"gpt-5",
+		"messages":[
+			{"role":"user","content":[{"type":"text","text":"先查一下 front"}]},
+			{"role":"assistant","content":[
+				{"type":"text","text":"我先看一下。"},
+				{"type":"tool_use","id":"call_1","name":"ls","input":{"path":"front"}}
+			]},
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_1","content":"frontend"}]},
+			{"role":"assistant","content":"已经拿到结果。"},
+			{"role":"user","content":[{"type":"text","text":"继续总结"}]}
+		]
+	}`)
+
+	result, err := provider.buildResponsesRequestFromClaude(body, upstream)
+	if err != nil {
+		t.Fatalf("buildResponsesRequestFromClaude() err = %v", err)
+	}
+
+	input, ok := result["input"].([]map[string]interface{})
+	if !ok {
+		b, _ := json.Marshal(result["input"])
+		var tmp []map[string]interface{}
+		if err := json.Unmarshal(b, &tmp); err != nil {
+			t.Fatalf("input decode err: %v", err)
+		}
+		input = tmp
+	}
+
+	if len(input) != 6 {
+		t.Fatalf("len(input) = %d, want 6", len(input))
+	}
+
+	assertMessageBlockType := func(index int, wantRole, wantType, wantText string) {
+		t.Helper()
+		if input[index]["type"] != "message" {
+			t.Fatalf("input[%d].type = %v, want message", index, input[index]["type"])
+		}
+		if input[index]["role"] != wantRole {
+			t.Fatalf("input[%d].role = %v, want %s", index, input[index]["role"], wantRole)
+		}
+
+		content, ok := input[index]["content"].([]map[string]interface{})
+		if !ok {
+			b, _ := json.Marshal(input[index]["content"])
+			if err := json.Unmarshal(b, &content); err != nil {
+				t.Fatalf("input[%d].content decode err: %v", index, err)
+			}
+		}
+		if len(content) != 1 {
+			t.Fatalf("input[%d].content len = %d, want 1", index, len(content))
+		}
+		if content[0]["type"] != wantType || content[0]["text"] != wantText {
+			t.Fatalf("input[%d].content[0] = %#v, want type=%s text=%q", index, content[0], wantType, wantText)
+		}
+	}
+
+	assertMessageBlockType(0, "user", "input_text", "先查一下 front")
+	assertMessageBlockType(1, "assistant", "output_text", "我先看一下。")
+	if input[2]["type"] != "function_call" {
+		t.Fatalf("input[2].type = %v, want function_call", input[2]["type"])
+	}
+	if input[3]["type"] != "function_call_output" {
+		t.Fatalf("input[3].type = %v, want function_call_output", input[3]["type"])
+	}
+	assertMessageBlockType(4, "assistant", "output_text", "已经拿到结果。")
+	assertMessageBlockType(5, "user", "input_text", "继续总结")
 }
 
 func TestResponsesProvider_ConvertToClaudeResponse(t *testing.T) {

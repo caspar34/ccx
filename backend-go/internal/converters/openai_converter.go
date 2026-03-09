@@ -50,6 +50,17 @@ func (c *OpenAIChatConverter) ToProviderRequest(sess *session.Session, req *type
 	if req.StreamOptions != nil {
 		openaiReq["stream_options"] = req.StreamOptions
 	}
+	if len(req.Tools) > 0 {
+		if tools := responsesToolsToOpenAI(req.Tools); len(tools) > 0 {
+			openaiReq["tools"] = tools
+		}
+	}
+	if req.ToolChoice != nil {
+		openaiReq["tool_choice"] = req.ToolChoice
+	}
+	if req.ParallelToolCalls != nil {
+		openaiReq["parallel_tool_calls"] = *req.ParallelToolCalls
+	}
 
 	return openaiReq, nil
 }

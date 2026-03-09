@@ -88,15 +88,11 @@ func TestGeminiResponseToResponses_UsesStableFunctionNameAsCallID(t *testing.T) 
 		t.Fatalf("expected 1 output item, got %d", len(resp.Output))
 	}
 
-	content, ok := resp.Output[0].Content.(map[string]interface{})
-	if !ok {
-		t.Fatal("expected function_call content to be map")
+	if resp.Output[0].Name != "get_weather" {
+		t.Fatalf("expected name get_weather, got %#v", resp.Output[0].Name)
 	}
-	if content["name"] != "get_weather" {
-		t.Fatalf("expected name get_weather, got %#v", content["name"])
-	}
-	if content["call_id"] != "get_weather" {
-		t.Fatalf("expected call_id get_weather, got %#v", content["call_id"])
+	if resp.Output[0].CallID != "get_weather" {
+		t.Fatalf("expected call_id get_weather, got %#v", resp.Output[0].CallID)
 	}
 
 	followupReq := &types.ResponsesRequest{
@@ -104,7 +100,7 @@ func TestGeminiResponseToResponses_UsesStableFunctionNameAsCallID(t *testing.T) 
 		Input: []interface{}{
 			map[string]interface{}{
 				"type":    "function_call_output",
-				"call_id": content["call_id"],
+				"call_id": resp.Output[0].CallID,
 				"output":  "Sunny, 72°F",
 			},
 		},
@@ -122,6 +118,41 @@ func TestGeminiResponseToResponses_UsesStableFunctionNameAsCallID(t *testing.T) 
 	}
 	if functionResponse.Name != "get_weather" {
 		t.Fatalf("expected function response name get_weather, got %q", functionResponse.Name)
+	}
+}
+
+func TestResponsesToGeminiRequest_PreservesStructuredFunctionOutput(t *testing.T) {
+	sess := &session.Session{ID: "sess_test"}
+	req := &types.ResponsesRequest{
+		Model: "gpt-4.1",
+		Input: []interface{}{
+			map[string]interface{}{
+				"type":    "function_call_output",
+				"call_id": "weather_call",
+				"output":  map[string]interface{}{"temperature": 72, "condition": "sunny"},
+			},
+		},
+	}
+
+	geminiReq, err := ResponsesToGeminiRequest(sess, req, "gemini-2.5-pro")
+	if err != nil {
+		t.Fatalf("ResponsesToGeminiRequest failed: %v", err)
+	}
+	if len(geminiReq.Contents) != 1 || len(geminiReq.Contents[0].Parts) != 1 {
+		t.Fatalf("expected single function response content, got %#v", geminiReq.Contents)
+	}
+	functionResponse := geminiReq.Contents[0].Parts[0].FunctionResponse
+	if functionResponse == nil {
+		t.Fatal("expected function response")
+	}
+	if functionResponse.Name != "weather_call" {
+		t.Fatalf("expected function response name weather_call, got %q", functionResponse.Name)
+	}
+	if functionResponse.Response["temperature"] != 72 {
+		t.Fatalf("expected temperature 72, got %#v", functionResponse.Response["temperature"])
+	}
+	if functionResponse.Response["condition"] != "sunny" {
+		t.Fatalf("expected condition sunny, got %#v", functionResponse.Response["condition"])
 	}
 }
 
@@ -316,5 +347,438 @@ func TestConvertGeminiStreamToResponses_UsesLateUsageMetadata(t *testing.T) {
 	}
 	if usage["output_tokens"].(float64) != 7 {
 		t.Fatalf("expected output_tokens 7, got %#v", usage["output_tokens"])
+	}
+}
+
+func TestResponsesToGeminiRequest_FunctionCallFallsBackToNestedContent(t *testing.T) {
+	sess := &session.Session{ID: "sess_test"}
+	req := &types.ResponsesRequest{
+		Model: "gpt-4.1",
+		Input: []interface{}{
+			map[string]interface{}{
+				"type": "function_call",
+				"content": map[string]interface{}{
+					"name":      "get_weather",
+					"arguments": `{"location":"Tokyo"}`,
+				},
+			},
+		},
+	}
+
+	geminiReq, err := ResponsesToGeminiRequest(sess, req, "gemini-2.5-pro")
+	if err != nil {
+		t.Fatalf("ResponsesToGeminiRequest failed: %v", err)
+	}
+	functionCall := geminiReq.Contents[0].Parts[0].FunctionCall
+	if functionCall == nil {
+		t.Fatal("expected function call")
+	}
+	if functionCall.Name != "get_weather" {
+		t.Fatalf("expected function name get_weather, got %q", functionCall.Name)
+	}
+	if functionCall.Args["location"] != "Tokyo" {
+		t.Fatalf("expected args.location Tokyo, got %#v", functionCall.Args["location"])
+	}
+}
+
+func TestResponsesResponseToGemini_PreservesStructuredFunctionOutput(t *testing.T) {
+	resp, err := ResponsesResponseToGemini(map[string]interface{}{
+		"status": "completed",
+		"output": []interface{}{
+			map[string]interface{}{
+				"type":    "function_call_output",
+				"call_id": "weather_call",
+				"output": map[string]interface{}{
+					"temperature": 72,
+					"condition":   "sunny",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+	}
+	if len(resp.Candidates) != 1 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) != 1 {
+		t.Fatalf("expected single function response part, got %#v", resp.Candidates)
+	}
+	functionResponse := resp.Candidates[0].Content.Parts[0].FunctionResponse
+	if functionResponse == nil {
+		t.Fatal("expected function response")
+	}
+	if functionResponse.Name != "weather_call" {
+		t.Fatalf("expected function response name weather_call, got %q", functionResponse.Name)
+	}
+	if functionResponse.Response["temperature"] != 72 {
+		t.Fatalf("expected temperature 72, got %#v", functionResponse.Response["temperature"])
+	}
+	if functionResponse.Response["condition"] != "sunny" {
+		t.Fatalf("expected condition sunny, got %#v", functionResponse.Response["condition"])
+	}
+}
+
+func TestResponsesResponseToGemini_WrapsScalarFunctionOutputConsistently(t *testing.T) {
+	resp, err := ResponsesResponseToGemini(map[string]interface{}{
+		"status": "completed",
+		"output": []interface{}{
+			map[string]interface{}{
+				"type":    "function_call_output",
+				"call_id": "weather_call",
+				"output":  true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+	}
+	functionResponse := resp.Candidates[0].Content.Parts[0].FunctionResponse
+	if functionResponse == nil {
+		t.Fatal("expected function response")
+	}
+	if functionResponse.Response["result"] != true {
+		t.Fatalf("expected scalar output wrapped under result, got %#v", functionResponse.Response)
+	}
+}
+
+func TestResponsesResponseToGemini_ExtractsMessageTextBlocks(t *testing.T) {
+	resp, err := ResponsesResponseToGemini(map[string]interface{}{
+		"status": "completed",
+		"output": []interface{}{
+			map[string]interface{}{
+				"type": "message",
+				"content": []interface{}{
+					map[string]interface{}{"type": "output_text", "text": "hello"},
+					map[string]interface{}{"type": "text", "text": "world"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+	}
+	parts := resp.Candidates[0].Content.Parts
+	if len(parts) != 2 {
+		t.Fatalf("expected 2 text parts, got %#v", parts)
+	}
+	if parts[0].Text != "hello" || parts[1].Text != "world" {
+		t.Fatalf("unexpected text parts: %#v", parts)
+	}
+}
+
+func TestResponsesResponseToGemini_UsesFunctionCallArguments(t *testing.T) {
+	resp, err := ResponsesResponseToGemini(map[string]interface{}{
+		"status": "completed",
+		"output": []interface{}{
+			map[string]interface{}{
+				"type":      "function_call",
+				"name":      "get_weather",
+				"arguments": `{"location":"Paris"}`,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+	}
+	functionCall := resp.Candidates[0].Content.Parts[0].FunctionCall
+	if functionCall == nil {
+		t.Fatal("expected function call")
+	}
+	if functionCall.Name != "get_weather" {
+		t.Fatalf("expected function name get_weather, got %q", functionCall.Name)
+	}
+	if functionCall.Args["location"] != "Paris" {
+		t.Fatalf("expected args.location Paris, got %#v", functionCall.Args["location"])
+	}
+}
+
+func TestResponsesResponseToGemini_MapsStatusToFinishReason(t *testing.T) {
+	cases := []struct {
+		status       string
+		expectReason string
+	}{
+		{status: "completed", expectReason: "STOP"},
+		{status: "incomplete", expectReason: "MAX_TOKENS"},
+		{status: "failed", expectReason: "SAFETY"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.status, func(t *testing.T) {
+			resp, err := ResponsesResponseToGemini(map[string]interface{}{
+				"status": tt.status,
+				"output": []interface{}{},
+			})
+			if err != nil {
+				t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+			}
+			if len(resp.Candidates) != 1 {
+				t.Fatalf("expected 1 candidate, got %d", len(resp.Candidates))
+			}
+			if resp.Candidates[0].FinishReason != tt.expectReason {
+				t.Fatalf("expected finish reason %q, got %q", tt.expectReason, resp.Candidates[0].FinishReason)
+			}
+		})
+	}
+}
+
+func TestResponsesToGeminiRequest_InvalidFunctionArgumentsFallsBackToEmptyArgs(t *testing.T) {
+	sess := &session.Session{ID: "sess_test"}
+	req := &types.ResponsesRequest{
+		Model: "gpt-4.1",
+		Input: []interface{}{
+			map[string]interface{}{
+				"type":      "function_call",
+				"call_id":   "call_invalid",
+				"name":      "get_weather",
+				"arguments": `{bad json}`,
+			},
+		},
+	}
+
+	geminiReq, err := ResponsesToGeminiRequest(sess, req, "gemini-2.5-pro")
+	if err != nil {
+		t.Fatalf("ResponsesToGeminiRequest failed: %v", err)
+	}
+	functionCall := geminiReq.Contents[0].Parts[0].FunctionCall
+	if functionCall == nil {
+		t.Fatal("expected function call")
+	}
+	if functionCall.Name != "get_weather" {
+		t.Fatalf("expected function name get_weather, got %q", functionCall.Name)
+	}
+	if functionCall.Args != nil {
+		t.Fatalf("expected invalid arguments to fall back to nil args, got %#v", functionCall.Args)
+	}
+}
+
+func TestResponsesToGeminiRequest_FunctionCallOutputMissingCallIDSkipsItem(t *testing.T) {
+	sess := &session.Session{ID: "sess_test"}
+	req := &types.ResponsesRequest{
+		Model: "gpt-4.1",
+		Input: []interface{}{
+			map[string]interface{}{
+				"type":   "function_call_output",
+				"output": "Sunny",
+			},
+		},
+	}
+
+	geminiReq, err := ResponsesToGeminiRequest(sess, req, "gemini-2.5-pro")
+	if err != nil {
+		t.Fatalf("ResponsesToGeminiRequest failed: %v", err)
+	}
+	if len(geminiReq.Contents) != 0 {
+		t.Fatalf("expected missing call_id item to be skipped, got %#v", geminiReq.Contents)
+	}
+}
+
+func TestResponsesToGeminiRequest_FunctionCallMissingNameSkipsItem(t *testing.T) {
+	sess := &session.Session{ID: "sess_test"}
+	req := &types.ResponsesRequest{
+		Model: "gpt-4.1",
+		Input: []interface{}{
+			map[string]interface{}{
+				"type":      "function_call",
+				"call_id":   "call_1",
+				"arguments": `{"location":"Tokyo"}`,
+			},
+		},
+	}
+
+	geminiReq, err := ResponsesToGeminiRequest(sess, req, "gemini-2.5-pro")
+	if err != nil {
+		t.Fatalf("ResponsesToGeminiRequest failed: %v", err)
+	}
+	if len(geminiReq.Contents) != 0 {
+		t.Fatalf("expected missing name item to be skipped, got %#v", geminiReq.Contents)
+	}
+}
+
+func TestResponsesToGeminiRequest_FunctionCallWithJSONArrayArgumentsFallsBackToNilArgs(t *testing.T) {
+	sess := &session.Session{ID: "sess_test"}
+	req := &types.ResponsesRequest{
+		Model: "gpt-4.1",
+		Input: []interface{}{
+			map[string]interface{}{
+				"type":      "function_call",
+				"call_id":   "call_array",
+				"name":      "get_weather",
+				"arguments": `["Tokyo","Berlin"]`,
+			},
+		},
+	}
+
+	geminiReq, err := ResponsesToGeminiRequest(sess, req, "gemini-2.5-pro")
+	if err != nil {
+		t.Fatalf("ResponsesToGeminiRequest failed: %v", err)
+	}
+	functionCall := geminiReq.Contents[0].Parts[0].FunctionCall
+	if functionCall == nil {
+		t.Fatal("expected function call")
+	}
+	if functionCall.Args != nil {
+		t.Fatalf("expected JSON array arguments to fall back to nil args, got %#v", functionCall.Args)
+	}
+}
+
+func TestGeminiResponsesRoundtrip_FunctionResponseObjectShape(t *testing.T) {
+	originalReq := &types.GeminiRequest{
+		Contents: []types.GeminiContent{
+			{
+				Role: "user",
+				Parts: []types.GeminiPart{
+					{
+						FunctionResponse: &types.GeminiFunctionResponse{
+							Name: "weather_call",
+							Response: map[string]interface{}{
+								"temperature": 72,
+								"condition":   "sunny",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	responsesReq, err := GeminiToResponsesRequest(originalReq, "gpt-4.1")
+	if err != nil {
+		t.Fatalf("GeminiToResponsesRequest failed: %v", err)
+	}
+	input, ok := responsesReq["input"].([]types.ResponsesItem)
+	if !ok || len(input) != 1 {
+		t.Fatalf("expected single responses item, got %#v", responsesReq["input"])
+	}
+	if input[0].Type != "function_call_output" || input[0].CallID != "weather_call" {
+		t.Fatalf("unexpected responses item: %#v", input[0])
+	}
+
+	responsesResp := map[string]interface{}{
+		"status": "completed",
+		"output": []interface{}{
+			map[string]interface{}{
+				"type":    input[0].Type,
+				"call_id": input[0].CallID,
+				"output":  input[0].Output,
+			},
+		},
+	}
+	geminiResp, err := ResponsesResponseToGemini(responsesResp)
+	if err != nil {
+		t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+	}
+	functionResponse := geminiResp.Candidates[0].Content.Parts[0].FunctionResponse
+	if functionResponse == nil {
+		t.Fatal("expected function response")
+	}
+	if functionResponse.Name != "weather_call" {
+		t.Fatalf("expected function response name weather_call, got %q", functionResponse.Name)
+	}
+	if functionResponse.Response["temperature"] != 72 || functionResponse.Response["condition"] != "sunny" {
+		t.Fatalf("unexpected function response payload: %#v", functionResponse.Response)
+	}
+}
+
+func TestGeminiResponsesRoundtrip_FunctionCallPreservesArguments(t *testing.T) {
+	originalResp := map[string]interface{}{
+		"candidates": []interface{}{
+			map[string]interface{}{
+				"content": map[string]interface{}{
+					"parts": []interface{}{
+						map[string]interface{}{
+							"functionCall": map[string]interface{}{
+								"name": "get_weather",
+								"args": map[string]interface{}{"location": "Paris", "unit": "celsius"},
+							},
+						},
+					},
+				},
+				"finishReason": "STOP",
+			},
+		},
+	}
+
+	responsesResp, err := GeminiResponseToResponses(originalResp, "sess_test")
+	if err != nil {
+		t.Fatalf("GeminiResponseToResponses failed: %v", err)
+	}
+	if len(responsesResp.Output) != 1 {
+		t.Fatalf("expected 1 output item, got %d", len(responsesResp.Output))
+	}
+	if responsesResp.Output[0].Type != "function_call" {
+		t.Fatalf("expected function_call, got %#v", responsesResp.Output[0])
+	}
+
+	convertedGemini, err := ResponsesResponseToGemini(map[string]interface{}{
+		"status": "completed",
+		"output": []interface{}{
+			map[string]interface{}{
+				"type":      responsesResp.Output[0].Type,
+				"call_id":   responsesResp.Output[0].CallID,
+				"name":      responsesResp.Output[0].Name,
+				"arguments": responsesResp.Output[0].Arguments,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+	}
+	functionCall := convertedGemini.Candidates[0].Content.Parts[0].FunctionCall
+	if functionCall == nil {
+		t.Fatal("expected function call")
+	}
+	if functionCall.Name != "get_weather" {
+		t.Fatalf("expected function name get_weather, got %q", functionCall.Name)
+	}
+	if functionCall.Args["location"] != "Paris" || functionCall.Args["unit"] != "celsius" {
+		t.Fatalf("unexpected function args: %#v", functionCall.Args)
+	}
+}
+
+func TestResponsesResponseToGemini_MessageContentStringIsIgnoredSafely(t *testing.T) {
+	resp, err := ResponsesResponseToGemini(map[string]interface{}{
+		"status": "completed",
+		"output": []interface{}{
+			map[string]interface{}{
+				"type":    "message",
+				"content": "plain string",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResponsesResponseToGemini failed: %v", err)
+	}
+	if len(resp.Candidates) != 1 {
+		t.Fatalf("expected 1 candidate, got %d", len(resp.Candidates))
+	}
+	if resp.Candidates[0].Content == nil {
+		t.Fatal("expected content")
+	}
+	if len(resp.Candidates[0].Content.Parts) != 0 {
+		t.Fatalf("expected unsupported string content to be ignored safely, got %#v", resp.Candidates[0].Content.Parts)
+	}
+}
+
+func TestResponsesToGeminiRequest_FunctionCallOutputFallsBackToName(t *testing.T) {
+	sess := &session.Session{ID: "sess_test"}
+	req := &types.ResponsesRequest{
+		Model: "gpt-4.1",
+		Input: []interface{}{
+			map[string]interface{}{
+				"type":   "function_call_output",
+				"name":   "weather_call",
+				"output": "Sunny, 72°F",
+			},
+		},
+	}
+
+	geminiReq, err := ResponsesToGeminiRequest(sess, req, "gemini-2.5-pro")
+	if err != nil {
+		t.Fatalf("ResponsesToGeminiRequest failed: %v", err)
+	}
+	functionResponse := geminiReq.Contents[0].Parts[0].FunctionResponse
+	if functionResponse == nil {
+		t.Fatal("expected function response")
+	}
+	if functionResponse.Name != "weather_call" {
+		t.Fatalf("expected function response name weather_call, got %q", functionResponse.Name)
 	}
 }

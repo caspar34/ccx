@@ -217,3 +217,151 @@ func TestResponsesToOpenAIChatMessages_ToolCallRoundtrip(t *testing.T) {
 	assert.Equal(t, "toolu_123", toolCalls[0]["id"])
 	assert.Equal(t, "toolu_123", messages[2]["tool_call_id"])
 }
+
+func TestResponsesToOpenAIChatMessages_SkipsLegacyToolCallMissingToolUse(t *testing.T) {
+	sess := &session.Session{
+		Messages: []types.ResponsesItem{},
+	}
+
+	messages, err := ResponsesToOpenAIChatMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":    "text",
+			"content": "hello",
+		},
+		map[string]interface{}{
+			"type": "tool_call",
+		},
+	}, "")
+	assert.NoError(t, err)
+	assert.Len(t, messages, 1)
+	assert.Equal(t, "user", messages[0]["role"])
+	assert.Equal(t, "hello", messages[0]["content"])
+}
+
+func TestResponsesToOpenAIChatMessages_FunctionCallOutputMissingCallIDReturnsNilMessage(t *testing.T) {
+	msg := responsesItemToOpenAIMessage(types.ResponsesItem{
+		Type:   "function_call_output",
+		Output: "Sunny",
+	})
+	assert.Nil(t, msg)
+}
+
+func TestResponsesToOpenAIChatMessages_FunctionCallMissingNameReturnsNilMessage(t *testing.T) {
+	msg := responsesItemToOpenAIMessage(types.ResponsesItem{
+		Type:      "function_call",
+		CallID:    "call_1",
+		Arguments: `{"location":"Tokyo"}`,
+	})
+	assert.Nil(t, msg)
+}
+
+func TestResponsesToOpenAIChatMessages_FunctionCallOutputObjectContentSerializesJSON(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	messages, err := ResponsesToOpenAIChatMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":    "function_call_output",
+			"call_id": "call_1",
+			"output": map[string]interface{}{
+				"temperature": 72,
+				"condition":   "sunny",
+			},
+		},
+	}, "")
+	assert.NoError(t, err)
+	assert.Len(t, messages, 1)
+	assert.Equal(t, "tool", messages[0]["role"])
+	content, ok := messages[0]["content"].(string)
+	assert.True(t, ok)
+	assert.Contains(t, content, "temperature")
+	assert.Contains(t, content, "sunny")
+}
+
+func TestResponsesToOpenAIChatMessages_MultipleFunctionCallsRemainSeparateMessages(t *testing.T) {
+	sess := &session.Session{Messages: []types.ResponsesItem{}}
+
+	messages, err := ResponsesToOpenAIChatMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":      "function_call",
+			"call_id":   "call_1",
+			"name":      "get_weather",
+			"arguments": `{"location":"Tokyo"}`,
+		},
+		map[string]interface{}{
+			"type":      "function_call",
+			"call_id":   "call_2",
+			"name":      "get_time",
+			"arguments": `{"timezone":"UTC"}`,
+		},
+	}, "")
+	assert.NoError(t, err)
+	assert.Len(t, messages, 2)
+	assert.Equal(t, "assistant", messages[0]["role"])
+	assert.Equal(t, "assistant", messages[1]["role"])
+	toolCalls0, ok := messages[0]["tool_calls"].([]map[string]interface{})
+	assert.True(t, ok)
+	assert.Len(t, toolCalls0, 1)
+	assert.Equal(t, "call_1", toolCalls0[0]["id"])
+	toolCalls1, ok := messages[1]["tool_calls"].([]map[string]interface{})
+	assert.True(t, ok)
+	assert.Len(t, toolCalls1, 1)
+	assert.Equal(t, "call_2", toolCalls1[0]["id"])
+}
+
+func TestResponsesToOpenAIChatMessages_NormalizesLegacySessionMessages(t *testing.T) {
+	sess := &session.Session{
+		Messages: []types.ResponsesItem{
+			{
+				Type: "tool_call",
+				ToolUse: &types.ToolUse{
+					ID:   "toolu_hist",
+					Name: "get_weather",
+					Input: map[string]interface{}{
+						"location": "Berlin",
+					},
+				},
+			},
+			{
+				Type: "tool_result",
+				Content: map[string]interface{}{
+					"tool_use_id": "toolu_hist",
+					"content":     map[string]interface{}{"temperature": 18},
+				},
+			},
+		},
+	}
+
+	messages, err := ResponsesToOpenAIChatMessages(sess, []interface{}{}, "")
+	assert.NoError(t, err)
+	assert.Len(t, messages, 2)
+	assert.Equal(t, "assistant", messages[0]["role"])
+	assert.Equal(t, "tool", messages[1]["role"])
+
+	toolCalls, ok := messages[0]["tool_calls"].([]map[string]interface{})
+	assert.True(t, ok)
+	assert.Len(t, toolCalls, 1)
+	assert.Equal(t, "toolu_hist", toolCalls[0]["id"])
+	assert.Equal(t, "get_weather", toolCalls[0]["function"].(map[string]interface{})["name"])
+	assert.Equal(t, "toolu_hist", messages[1]["tool_call_id"])
+}
+
+func TestResponsesToOpenAIChatMessages_FunctionCallDefaultsCallIDToName(t *testing.T) {
+	sess := &session.Session{
+		Messages: []types.ResponsesItem{},
+	}
+
+	messages, err := ResponsesToOpenAIChatMessages(sess, []interface{}{
+		map[string]interface{}{
+			"type":      "function_call",
+			"name":      "get_weather",
+			"arguments": `{"location":"Tokyo"}`,
+		},
+	}, "")
+	assert.NoError(t, err)
+	assert.Len(t, messages, 1)
+
+	toolCalls, ok := messages[0]["tool_calls"].([]map[string]interface{})
+	assert.True(t, ok)
+	assert.Len(t, toolCalls, 1)
+	assert.Equal(t, "get_weather", toolCalls[0]["id"])
+}

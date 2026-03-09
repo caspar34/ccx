@@ -108,7 +108,7 @@ func ConvertResponsesToOpenAIChatRequest(modelName string, inputRawJSON []byte, 
 
 	// 转换 tool_choice
 	if toolChoice := root.Get("tool_choice"); toolChoice.Exists() {
-		out, _ = sjson.Set(out, "tool_choice", toolChoice.String())
+		out, _ = sjson.Set(out, "tool_choice", toolChoice.Value())
 	}
 
 	return []byte(out)

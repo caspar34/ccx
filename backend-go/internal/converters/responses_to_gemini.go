@@ -60,28 +60,24 @@ func ResponsesToGeminiRequest(sess *session.Session, req *types.ResponsesRequest
 		geminiReq.GenerationConfig.TopP = &topP
 	}
 
-	// 5. 转换 tools（ResponsesRequest 没有 Tools 字段，跳过）
-	// tools 在 Responses API 中通过 raw JSON 传递，转换器层面不处理
+	// 5. 转换 tools
+	if len(req.Tools) > 0 {
+		geminiReq.Tools = responsesToolsToGemini(req.Tools)
+	}
 
 	return geminiReq, nil
 }
 
 // responsesItemToGeminiContents 将 Responses Item 转换为 Gemini Contents
 func responsesItemToGeminiContents(item types.ResponsesItem) []types.GeminiContent {
+	item = types.NormalizeResponsesItem(item)
 	contents := []types.GeminiContent{}
 
 	switch item.Type {
 	case "message":
 		// 消息类型
-		role := item.Role
-		if role == "" {
-			role = "user"
-		}
-		if role == "assistant" {
-			role = "model"
-		}
-
-		contentText := extractTextFromContent(item.Content)
+		role, contentText := resolveResponsesTextItem(item)
+		role = normalizeGeminiRole(role)
 		if contentText == "" {
 			return nil
 		}
@@ -95,17 +91,10 @@ func responsesItemToGeminiContents(item types.ResponsesItem) []types.GeminiConte
 
 	case "text":
 		// 旧格式文本
-		contentStr := extractTextFromContent(item.Content)
+		role, contentStr := resolveResponsesTextItem(item)
+		role = normalizeGeminiRole(role)
 		if contentStr == "" {
 			return nil
-		}
-
-		role := "user"
-		if item.Role != "" {
-			role = item.Role
-		}
-		if role == "assistant" {
-			role = "model"
 		}
 
 		contents = append(contents, types.GeminiContent{
@@ -116,41 +105,9 @@ func responsesItemToGeminiContents(item types.ResponsesItem) []types.GeminiConte
 		})
 
 	case "function_call":
-		// 工具调用
-		// 支持两种格式:
-		// 1. Content 是 map[string]interface{} (从 parseResponsesInput 保留的完整 itemMap)
-		// 2. Content 是嵌套的 content 字段 (旧格式兼容)
-		var name, argsStr string
-
-		if contentMap, ok := item.Content.(map[string]interface{}); ok {
-			// 优先从顶层读取 (新格式)
-			if n, ok := contentMap["name"].(string); ok {
-				name = n
-			}
-			if a, ok := contentMap["arguments"].(string); ok {
-				argsStr = a
-			}
-
-			// 如果顶层没有,尝试从嵌套的 content 字段读取 (旧格式)
-			if name == "" || argsStr == "" {
-				if nestedContent, ok := contentMap["content"].(map[string]interface{}); ok {
-					if name == "" {
-						name, _ = nestedContent["name"].(string)
-					}
-					if argsStr == "" {
-						argsStr, _ = nestedContent["arguments"].(string)
-					}
-				}
-			}
-		}
-
-		if name == "" {
+		_, name, arguments, err := resolveFunctionCallItem(item)
+		if err != nil {
 			return nil
-		}
-
-		var args map[string]interface{}
-		if argsStr != "" {
-			_ = JSONUnmarshal([]byte(argsStr), &args)
 		}
 
 		contents = append(contents, types.GeminiContent{
@@ -159,7 +116,7 @@ func responsesItemToGeminiContents(item types.ResponsesItem) []types.GeminiConte
 				{
 					FunctionCall: &types.GeminiFunctionCall{
 						Name:             name,
-						Args:             args,
+						Args:             parseGeminiFunctionCallArgs(arguments),
 						ThoughtSignature: types.DummyThoughtSignature,
 					},
 				},
@@ -167,51 +124,9 @@ func responsesItemToGeminiContents(item types.ResponsesItem) []types.GeminiConte
 		})
 
 	case "function_call_output":
-		// 工具结果
-		// 支持两种格式:
-		// 1. Content 是 map[string]interface{} (从 parseResponsesInput 保留的完整 itemMap)
-		// 2. Content 是嵌套的 content 字段 (旧格式兼容)
-		var name string
-		var output interface{}
-
-		if contentMap, ok := item.Content.(map[string]interface{}); ok {
-			// 优先从顶层读取 (新格式)
-			if n, ok := contentMap["name"].(string); ok {
-				name = n
-			}
-			if name == "" {
-				// 兼容 Responses 顶层 function_call_output 使用 call_id 的格式
-				name, _ = contentMap["call_id"].(string)
-			}
-			if o := contentMap["output"]; o != nil {
-				output = o
-			}
-
-			// 如果顶层没有,尝试从嵌套的 content 字段读取 (旧格式)
-			if name == "" || output == nil {
-				if nestedContent, ok := contentMap["content"].(map[string]interface{}); ok {
-					if name == "" {
-						// 旧格式使用 call_id 作为 name
-						name, _ = nestedContent["call_id"].(string)
-					}
-					if output == nil {
-						output = nestedContent["output"]
-					}
-				}
-			}
-		}
-
-		if name == "" {
+		callID, output, err := resolveFunctionCallOutputItem(item)
+		if err != nil {
 			return nil
-		}
-
-		var responseMap map[string]interface{}
-		if str, ok := output.(string); ok {
-			responseMap = map[string]interface{}{"result": str}
-		} else if m, ok := output.(map[string]interface{}); ok {
-			responseMap = m
-		} else {
-			responseMap = map[string]interface{}{"result": fmt.Sprintf("%v", output)}
 		}
 
 		contents = append(contents, types.GeminiContent{
@@ -219,8 +134,8 @@ func responsesItemToGeminiContents(item types.ResponsesItem) []types.GeminiConte
 			Parts: []types.GeminiPart{
 				{
 					FunctionResponse: &types.GeminiFunctionResponse{
-						Name:     name,
-						Response: responseMap,
+						Name:     callID,
+						Response: buildGeminiFunctionResponsePayload(output),
 					},
 				},
 			},
@@ -291,13 +206,11 @@ func GeminiResponseToResponses(geminiResp map[string]interface{}, sessionID stri
 
 			// 使用函数名作为 call_id,与 function_call_output 的 name 字段保持一致
 			output = append(output, types.ResponsesItem{
-				Type: "function_call",
-				Role: "assistant",
-				Content: map[string]interface{}{
-					"call_id":   name, // 使用函数名而非随机 ID
-					"name":      name,
-					"arguments": string(argsJSON),
-				},
+				Type:      "function_call",
+				Role:      "assistant",
+				CallID:    name, // 使用函数名而非随机 ID
+				Name:      name,
+				Arguments: string(argsJSON),
 			})
 		}
 	}
