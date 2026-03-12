@@ -5,10 +5,10 @@
       <div class="d-flex align-center" style="flex-shrink: 1; min-width: 0;">
         <v-icon class="mr-2" color="primary">mdi-swap-vertical-bold</v-icon>
         <span class="text-h6" style="white-space: nowrap;">{{ t('orchestration.title') }}</span>
-        <v-chip v-if="isMultiChannelMode" size="small" color="success" variant="tonal" class="ml-3">
+        <v-chip v-if="isMultiChannelMode" size="small" color="success" variant="tonal" class="ml-3 mode-chip">
           {{ t('orchestration.multiChannel') }}
         </v-chip>
-        <v-chip v-else size="small" color="warning" variant="tonal" class="ml-3"> {{ t('orchestration.singleChannel') }} </v-chip>
+        <v-chip v-else size="small" color="warning" variant="tonal" class="ml-3 mode-chip"> {{ t('orchestration.singleChannel') }} </v-chip>
       </div>
       <div class="d-flex align-center ga-2">
         <v-text-field
@@ -1860,6 +1860,10 @@ defineExpose({
 }
 
 @media (max-width: 600px) {
+  .mode-chip {
+    display: none;
+  }
+
   .channel-row-content {
     grid-template-columns: 28px 1fr 60px;
     gap: 8px;
