@@ -4,7 +4,7 @@
     <v-snackbar v-model="showError" color="error" :timeout="3000" location="top">
       {{ errorMessage }}
       <template #actions>
-        <v-btn variant="text" @click="showError = false">关闭</v-btn>
+        <v-btn variant="text" @click="showError = false">{{ t('chart.close') }}</v-btn>
       </template>
     </v-snackbar>
 
@@ -12,15 +12,15 @@
     <div class="chart-header d-flex align-center justify-space-between mb-3">
       <div class="d-flex align-center ga-2">
         <v-btn-toggle v-model="selectedDuration" mandatory density="compact" variant="outlined" divided :disabled="isLoading">
-          <v-btn value="1h" size="x-small">1小时</v-btn>
-          <v-btn value="6h" size="x-small">6小时</v-btn>
-          <v-btn value="24h" size="x-small">24小时</v-btn>
+          <v-btn value="1h" size="x-small">{{ t('chart.1h') }}</v-btn>
+          <v-btn value="6h" size="x-small">{{ t('chart.6h') }}</v-btn>
+          <v-btn value="24h" size="x-small">{{ t('chart.24h') }}</v-btn>
         </v-btn-toggle>
         <v-btn icon size="x-small" variant="text" :loading="isLoading" :disabled="isLoading" @click="refreshData">
           <v-icon size="small">mdi-refresh</v-icon>
         </v-btn>
       </div>
-      <v-btn icon size="x-small" variant="text" title="收起" @click="$emit('close')">
+      <v-btn icon size="x-small" variant="text" :title="t('chart.collapse')" @click="$emit('close')">
         <v-icon size="small">mdi-chevron-up</v-icon>
       </v-btn>
     </div>
@@ -33,7 +33,7 @@
     <!-- Empty state -->
     <div v-else-if="!hasData" class="d-flex flex-column justify-center align-center text-medium-emphasis" style="height: 150px">
       <v-icon size="32" color="grey-lighten-1">mdi-chart-line-variant</v-icon>
-      <div class="text-caption mt-1">选定时间范围内没有请求记录</div>
+      <div class="text-caption mt-1">{{ t('chart.noRequestsInRange') }}</div>
     </div>
 
     <!-- Charts -->
@@ -41,7 +41,7 @@
       <div class="chart-row">
         <!-- Request count chart -->
         <div class="chart-item">
-          <div class="text-caption text-medium-emphasis mb-1">请求数量</div>
+          <div class="text-caption text-medium-emphasis mb-1">{{ t('chart.totalRequests') }}</div>
           <apexchart
             type="area"
             height="120"
@@ -52,7 +52,7 @@
 
         <!-- Success rate chart -->
         <div class="chart-item">
-          <div class="text-caption text-medium-emphasis mb-1">成功率</div>
+          <div class="text-caption text-medium-emphasis mb-1">{{ t('chart.successRate') }}</div>
           <apexchart
             type="line"
             height="120"
@@ -71,6 +71,7 @@ import { useTheme } from 'vuetify'
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
 import { api, type MetricsHistoryResponse } from '../services/api'
+import { useI18n } from '../i18n'
 
 // Register apexchart component
 const apexchart = VueApexCharts
@@ -86,6 +87,7 @@ const _emit = defineEmits<{
 }>()
 
 const theme = useTheme()
+const { t } = useI18n()
 
 // State
 const selectedDuration = ref<'1h' | '6h' | '24h'>('6h')
@@ -206,7 +208,7 @@ const successRateOptions = computed<ApexOptions>(() => ({
 const requestCountSeries = computed(() => {
   if (!historyData.value || !historyData.value.dataPoints) return []
   return [{
-    name: '请求数',
+    name: t('status.metrics.requests'),
     data: historyData.value.dataPoints.map(dp => ({
       x: new Date(dp.timestamp).getTime(),
       y: dp.requestCount
@@ -218,7 +220,7 @@ const requestCountSeries = computed(() => {
 const successRateSeries = computed(() => {
   if (!historyData.value || !historyData.value.dataPoints) return []
   return [{
-    name: '成功率',
+    name: t('chart.successRate'),
     data: historyData.value.dataPoints
       .filter(dp => dp.requestCount > 0)
       .map(dp => ({
@@ -243,7 +245,7 @@ const refreshData = async () => {
     historyData.value = allData.find(ch => ch.channelIndex === props.channelIndex) || null
   } catch (error) {
     console.error('Failed to fetch metrics history:', error)
-    errorMessage.value = error instanceof Error ? error.message : '获取历史数据失败'
+    errorMessage.value = error instanceof Error ? error.message : t('chart.historyLoadFailed')
     showError.value = true
     historyData.value = null
   } finally {

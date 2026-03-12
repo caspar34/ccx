@@ -9,6 +9,7 @@ type EnvConfig struct {
 	Port                 int
 	Env                  string
 	EnableWebUI          bool
+	UILanguage           string
 	ProxyAccessKey       string
 	AdminAccessKey       string // 管理 API 独立密钥（可选，未设置时回退到 ProxyAccessKey）
 	LogLevel             string
@@ -53,6 +54,7 @@ func NewEnvConfig() *EnvConfig {
 		Port:                 getEnvAsInt("PORT", 3000),
 		Env:                  env,
 		EnableWebUI:          getEnv("ENABLE_WEB_UI", "true") != "false",
+		UILanguage:           normalizeUILanguage(getEnv("APP_UI_LANGUAGE", "en")),
 		ProxyAccessKey:       getEnv("PROXY_ACCESS_KEY", "your-proxy-access-key"),
 		AdminAccessKey:       getEnv("ADMIN_ACCESS_KEY", ""), // 空值时回退到 ProxyAccessKey
 		LogLevel:             getEnv("LOG_LEVEL", "info"),
@@ -83,6 +85,19 @@ func NewEnvConfig() *EnvConfig {
 		LogMaxAge:     getEnvAsInt("LOG_MAX_AGE", 30),     // 默认保留 30 天
 		LogCompress:   getEnv("LOG_COMPRESS", "true") != "false",
 		LogToConsole:  getEnv("LOG_TO_CONSOLE", "true") != "false",
+	}
+}
+
+func normalizeUILanguage(value string) string {
+	switch value {
+	case "en", "EN", "en-US", "en-us":
+		return "en"
+	case "id", "ID", "id-ID", "id-id":
+		return "id"
+	case "zh", "ZH", "zh-CN", "zh-cn":
+		return "zh-CN"
+	default:
+		return "en"
 	}
 }
 

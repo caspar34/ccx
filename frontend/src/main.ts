@@ -6,6 +6,8 @@ import router from './router'
 import App from './App.vue'
 import './assets/style.css'
 import { useAuthStore } from './stores/auth'
+import { usePreferencesStore } from './stores/preferences'
+import { applyDocumentLanguage, getRuntimeLocale } from './i18n'
 
 const app = createApp(App)
 
@@ -19,5 +21,9 @@ app.use(router)
 // 初始化 AuthStore（从 localStorage 恢复状态）
 const authStore = useAuthStore()
 authStore.initializeAuth()
+
+const preferencesStore = usePreferencesStore()
+preferencesStore.initializeUILanguage(getRuntimeLocale())
+applyDocumentLanguage(preferencesStore.uiLanguage)
 
 app.mount('#app')

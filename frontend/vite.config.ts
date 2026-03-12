@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
 
   const frontendPort = parseInt(env.VITE_FRONTEND_PORT || '5173')
   const backendUrl = env.VITE_PROXY_TARGET || 'http://localhost:3000'
+  const uiLanguage = env.APP_UI_LANGUAGE || 'en'
 
   return {
     // 使用绝对路径，适配 Go 嵌入式部署
@@ -27,6 +28,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': resolve(__dirname, 'src')
       }
+    },
+    define: {
+      __APP_UI_LANGUAGE__: JSON.stringify(uiLanguage)
     },
     server: {
       port: frontendPort,

@@ -281,7 +281,7 @@ func main() {
 
 	// 静态文件服务 (嵌入的前端)
 	if envCfg.EnableWebUI {
-		handlers.ServeFrontend(r, frontendFS)
+		handlers.ServeFrontend(r, frontendFS, envCfg)
 	} else {
 		// 纯 API 模式
 		r.GET("/", func(c *gin.Context) {

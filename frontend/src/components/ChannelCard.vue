@@ -30,7 +30,7 @@
               </div>
             </div>
             <!-- 官网图标按钮（紧贴标题右侧） -->
-            <v-tooltip v-if="channel.website" text="打开官网" location="bottom" :open-delay="150">
+            <v-tooltip v-if="channel.website" :text="t('channelCard.openWebsite')" location="bottom" :open-delay="150">
               <template #activator="{ props: tooltipProps }">
                 <v-btn v-bind="tooltipProps" :href="channel.website" target="_blank" rel="noopener" size="small" variant="text" color="primary" icon>
                   <v-icon size="18">mdi-open-in-new</v-icon>
@@ -75,7 +75,7 @@
             rounded="lg"
           >
             <v-icon start size="small">mdi-stop-circle</v-icon>
-            停用
+            {{ t('channelCard.disabled') }}
           </v-chip>
           <v-chip
             v-else-if="channel.status === 'suspended'"
@@ -86,7 +86,7 @@
             rounded="lg"
           >
             <v-icon start size="small">mdi-pause-circle</v-icon>
-            熔断
+            {{ t('channelCard.suspended') }}
           </v-chip>
         </div>
       </v-card-title>
@@ -143,7 +143,7 @@
             <div class="d-flex align-center justify-space-between w-100">
               <div class="d-flex align-center ga-2">
                 <v-icon size="small">mdi-key-chain</v-icon>
-                <span class="text-body-2 font-weight-medium">API密钥管理</span>
+                <span class="text-body-2 font-weight-medium">{{ t('channelCard.apiKeyManagement') }}</span>
               </div>
               <v-chip
                 :color="channel.apiKeys.length ? 'secondary' : 'warning'"
@@ -161,7 +161,7 @@
           </v-expansion-panel-title>
           <v-expansion-panel-text>
             <div class="d-flex align-center justify-space-between mb-3">
-              <span class="text-body-2 font-weight-medium">已配置的密钥</span>
+              <span class="text-body-2 font-weight-medium">{{ t('channelCard.configuredKeys') }}</span>
               <v-btn
                 size="small"
                 color="primary"
@@ -183,7 +183,7 @@
                 <code class="text-caption flex-1-1 text-truncate mr-2">{{ maskApiKey(key) }}</code>
                 <div class="d-flex align-center ga-1">
                   <!-- 置顶按钮：仅最后一个 key 显示 -->
-                  <v-tooltip v-if="index === channel.apiKeys.length - 1 && channel.apiKeys.length > 1" text="置顶" location="top" :open-delay="150">
+                  <v-tooltip v-if="index === channel.apiKeys.length - 1 && channel.apiKeys.length > 1" :text="t('channelCard.moveTop')" location="top" :open-delay="150">
                     <template #activator="{ props: tooltipProps }">
                       <v-btn v-bind="tooltipProps" size="x-small" color="warning" icon variant="text" rounded="md" @click="$emit('moveKeyToTop', channel.index, key)">
                         <v-icon size="small">mdi-arrow-up-bold</v-icon>
@@ -191,14 +191,14 @@
                     </template>
                   </v-tooltip>
                   <!-- 置底按钮：仅第一个 key 显示 -->
-                  <v-tooltip v-if="index === 0 && channel.apiKeys.length > 1" text="置底" location="top" :open-delay="150">
+                  <v-tooltip v-if="index === 0 && channel.apiKeys.length > 1" :text="t('channelCard.moveBottom')" location="top" :open-delay="150">
                     <template #activator="{ props: tooltipProps }">
                       <v-btn v-bind="tooltipProps" size="x-small" color="warning" icon variant="text" rounded="md" @click="$emit('moveKeyToBottom', channel.index, key)">
                         <v-icon size="small">mdi-arrow-down-bold</v-icon>
                       </v-btn>
                     </template>
                   </v-tooltip>
-                  <v-tooltip :text="copiedKeyIndex === index ? '已复制!' : '复制密钥'" location="top" :open-delay="150">
+                  <v-tooltip :text="copiedKeyIndex === index ? t('channelCard.copied') : t('channelCard.copyKey')" location="top" :open-delay="150">
                     <template #activator="{ props: tooltipProps }">
                       <v-btn
                         v-bind="tooltipProps"
@@ -228,7 +228,7 @@
             </div>
             
             <div v-else class="text-center py-4">
-              <span class="text-body-2 text-medium-emphasis">暂无API密钥</span>
+              <span class="text-body-2 text-medium-emphasis">{{ t('channelCard.noApiKeys') }}</span>
             </div>
           </v-expansion-panel-text>
         </v-expansion-panel>
@@ -245,7 +245,7 @@
           prepend-icon="mdi-speedometer"
           @click="$emit('ping', channel.index)"
         >
-          测试延迟
+          {{ t('app.actions.ping') }}
         </v-btn>
 
         <v-btn
@@ -257,7 +257,7 @@
           prepend-icon="mdi-test-tube"
           @click="$emit('testCapability', channel.index)"
         >
-          能力测试
+          {{ t('addChannel.testCapability') }}
         </v-btn>
         
         <v-btn
@@ -269,7 +269,7 @@
           prepend-icon="mdi-pencil"
           @click="$emit('edit', channel)"
         >
-          编辑
+          {{ t('orchestration.edit') }}
         </v-btn>
         
         <v-btn
@@ -281,7 +281,7 @@
           prepend-icon="mdi-delete"
           @click="$emit('delete', channel.index)"
         >
-          删除
+          {{ t('orchestration.delete') }}
         </v-btn>
       </div>
     </v-card-text>
@@ -291,12 +291,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Channel } from '../services/api'
+import { useI18n } from '../i18n'
 
 interface Props {
   channel: Channel
 }
 
 const props = defineProps<Props>()
+const { t } = useI18n()
 
 // 复制功能相关状态
 const copiedKeyIndex = ref<number | null>(null)
@@ -345,20 +347,18 @@ const getStatusIcon = () => {
 
 // 获取状态文本
 const getStatusText = () => {
-  const textMap: Record<string, string> = {
-    'healthy': '健康',
-    'error': '错误',
-    'unknown': '未检测'
-  }
-  return textMap[props.channel.status || 'unknown']
+  const status = props.channel.status || 'unknown'
+  if (status === 'healthy') return t('channelCard.statusHealthy')
+  if (status === 'error') return t('channelCard.statusError')
+  return t('channelCard.notChecked')
 }
 
 // 状态解释文案（悬浮提示）
 const getStatusTooltip = () => {
   const status = props.channel.status || 'unknown'
-  if (status === 'healthy') return '连接正常：最近一次检测通过'
-  if (status === 'error') return '连接异常：请检查基础 URL、网络或 API 密钥'
-  return '尚未检测：请点击“测试延迟”进行检测'
+  if (status === 'healthy') return t('channelCard.tooltipHealthy')
+  if (status === 'error') return t('channelCard.tooltipError')
+  return t('channelCard.tooltipUnknown')
 }
 
 // 掩码API密钥用于显示
@@ -383,7 +383,7 @@ const copyApiKey = async (key: string, index: number) => {
       copiedKeyIndex.value = null
     }, 2000)
   } catch (err) {
-    console.error('复制密钥失败:', err)
+    console.error(t('channelCard.copyKey'), err)
     // 降级方案：使用传统的复制方法
     const textArea = document.createElement('textarea')
     textArea.value = key
@@ -402,7 +402,7 @@ const copyApiKey = async (key: string, index: number) => {
         copiedKeyIndex.value = null
       }, 2000)
     } catch (err) {
-      console.error('降级复制方案也失败:', err)
+      console.error(t('channelCard.copyKey'), err)
     } finally {
       textArea.remove()
     }

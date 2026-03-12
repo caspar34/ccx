@@ -11,14 +11,14 @@
         <div class="font-weight-bold mb-1">{{ statusLabel }}</div>
         <template v-if="metrics">
           <div class="text-caption">
-            <div>请求数: {{ metrics.requestCount }}</div>
-            <div>成功率: {{ metrics.successRate?.toFixed(1) || 0 }}%</div>
-            <div>连续失败: {{ metrics.consecutiveFailures }}</div>
-            <div v-if="metrics.lastSuccessAt">最后成功: {{ formatTime(metrics.lastSuccessAt) }}</div>
-            <div v-if="metrics.lastFailureAt">最后失败: {{ formatTime(metrics.lastFailureAt) }}</div>
+            <div>{{ t('status.metrics.requests') }}: {{ metrics.requestCount }}</div>
+            <div>{{ t('status.metrics.successRate') }}: {{ metrics.successRate?.toFixed(1) || 0 }}%</div>
+            <div>{{ t('status.metrics.consecutiveFailures') }}: {{ metrics.consecutiveFailures }}</div>
+            <div v-if="metrics.lastSuccessAt">{{ t('status.metrics.lastSuccess') }}: {{ formatTime(metrics.lastSuccessAt) }}</div>
+            <div v-if="metrics.lastFailureAt">{{ t('status.metrics.lastFailure') }}: {{ formatTime(metrics.lastFailureAt) }}</div>
           </div>
         </template>
-        <div v-else class="text-caption text-medium-emphasis">暂无指标数据</div>
+        <div v-else class="text-caption text-medium-emphasis">{{ t('status.metrics.noData') }}</div>
       </div>
     </v-tooltip>
   </div>
@@ -27,6 +27,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ChannelStatus, ChannelMetrics } from '../services/api'
+import { useI18n } from '../i18n'
 
 const props = withDefaults(defineProps<{
   status: ChannelStatus | 'healthy' | 'error' | 'unknown'
@@ -38,42 +39,44 @@ const props = withDefaults(defineProps<{
   size: 'default'
 })
 
+const { t } = useI18n()
+
 // 状态配置映射
 const STATUS_CONFIG: Record<string, { icon: string; color: string; label: string; class: string }> = {
   active: {
     icon: 'mdi-check-circle',
     color: 'success',
-    label: '活跃',
+    label: 'status.active',
     class: 'status-active'
   },
   healthy: {
     icon: 'mdi-check-circle',
     color: 'success',
-    label: '健康',
+    label: 'status.healthy',
     class: 'status-active'
   },
   suspended: {
     icon: 'mdi-pause-circle',
     color: 'warning',
-    label: '熔断',
+    label: 'status.suspended',
     class: 'status-suspended'
   },
   disabled: {
     icon: 'mdi-close-circle',
     color: 'error',
-    label: '禁用',
+    label: 'status.disabled',
     class: 'status-disabled'
   },
   error: {
     icon: 'mdi-alert-circle',
     color: 'error',
-    label: '错误',
+    label: 'status.error',
     class: 'status-error'
   },
   unknown: {
     icon: 'mdi-help-circle',
     color: 'grey',
-    label: '未知',
+    label: 'status.unknown',
     class: 'status-unknown'
   }
 }
@@ -84,7 +87,7 @@ const statusConfig = computed(() => {
 })
 
 const statusIcon = computed(() => statusConfig.value.icon)
-const statusLabel = computed(() => statusConfig.value.label)
+const statusLabel = computed(() => t(statusConfig.value.label as Parameters<typeof t>[0]))
 const statusClass = computed(() => statusConfig.value.class)
 
 const iconSize = computed(() => {
@@ -104,11 +107,11 @@ const formatTime = (dateStr: string): string => {
   const diff = now.getTime() - date.getTime()
 
   if (diff < 60000) {
-    return '刚刚'
+    return t('status.metrics.justNow')
   } else if (diff < 3600000) {
-    return `${Math.floor(diff / 60000)} 分钟前`
+    return t('status.metrics.minutesAgo', { count: Math.floor(diff / 60000) })
   } else if (diff < 86400000) {
-    return `${Math.floor(diff / 3600000)} 小时前`
+    return t('status.metrics.hoursAgo', { count: Math.floor(diff / 3600000) })
   } else {
     return date.toLocaleDateString()
   }

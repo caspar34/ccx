@@ -4,7 +4,7 @@
     <v-snackbar v-model="showError" color="error" :timeout="3000" location="top">
       {{ errorMessage }}
       <template #actions>
-        <v-btn variant="text" @click="showError = false">关闭</v-btn>
+        <v-btn variant="text" @click="showError = false">{{ t('chart.close') }}</v-btn>
       </template>
     </v-snackbar>
 
@@ -13,10 +13,10 @@
       <div class="d-flex align-center ga-2">
         <!-- 时间范围选择器 -->
         <v-btn-toggle v-model="selectedDuration" mandatory density="compact" variant="outlined" divided :disabled="isLoading">
-          <v-btn value="1h" size="x-small">1小时</v-btn>
-          <v-btn value="6h" size="x-small">6小时</v-btn>
-          <v-btn value="24h" size="x-small">24小时</v-btn>
-          <v-btn value="today" size="x-small">今日</v-btn>
+          <v-btn value="1h" size="x-small">{{ t('chart.1h') }}</v-btn>
+          <v-btn value="6h" size="x-small">{{ t('chart.6h') }}</v-btn>
+          <v-btn value="24h" size="x-small">{{ t('chart.24h') }}</v-btn>
+          <v-btn value="today" size="x-small">{{ t('chart.today') }}</v-btn>
         </v-btn-toggle>
 
         <v-btn icon size="x-small" variant="text" :loading="isLoading" :disabled="isLoading" @click="refreshData">
@@ -28,7 +28,7 @@
       <v-btn-toggle v-model="selectedView" mandatory density="compact" variant="outlined" divided :disabled="isLoading">
         <v-btn value="traffic" size="x-small">
           <v-icon size="small" class="mr-1">mdi-chart-line</v-icon>
-          流量
+          {{ t('chart.traffic') }}
         </v-btn>
         <v-btn value="tokens" size="x-small">
           <v-icon size="small" class="mr-1">mdi-chart-line</v-icon>
@@ -36,7 +36,7 @@
         </v-btn>
         <v-btn value="cache" size="x-small">
           <v-icon size="small" class="mr-1">mdi-database</v-icon>
-          缓存 R/W
+          {{ t('chart.cacheRw') }}
         </v-btn>
       </v-btn-toggle>
     </div>
@@ -49,7 +49,7 @@
     <!-- Empty state -->
     <div v-else-if="!hasData" class="d-flex flex-column justify-center align-center text-medium-emphasis" style="height: 200px">
       <v-icon size="40" color="grey-lighten-1">mdi-chart-timeline-variant</v-icon>
-      <div class="text-caption mt-2">选定时间范围内没有 Key 使用记录</div>
+      <div class="text-caption mt-2">{{ t('chart.noKeyUsageInRange') }}</div>
     </div>
 
     <!-- 图表区域 -->
@@ -72,6 +72,7 @@ import { useTheme } from 'vuetify'
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
 import { api, type ChannelKeyMetricsHistoryResponse } from '../services/api'
+import { useI18n } from '../i18n'
 
 // Register apexchart component
 const apexchart = VueApexCharts
@@ -81,6 +82,7 @@ const props = defineProps<{
   channelId: number
   channelType: 'messages' | 'chat' | 'responses' | 'gemini'
 }>()
+const { t } = useI18n()
 
 // View mode type
 type ViewMode = 'traffic' | 'tokens' | 'cache'
@@ -533,7 +535,7 @@ const formatAxisValue = (val: number, mode: ViewMode): string => {
 const formatTooltipValue = (val: number, mode: ViewMode): string => {
   switch (mode) {
     case 'traffic':
-      return `${Math.round(val)} 请求`
+      return `${Math.round(val)} ${t('chart.requestUnit')}`
     case 'tokens':
     case 'cache':
       return formatNumber(Math.abs(val))
@@ -626,7 +628,7 @@ const buildTrafficTooltip = ({ seriesIndex, dataPointIndex, w }: any): string =>
     html += `<span style="flex: 1;">${stat.keyMask}</span>`
     html += `<span style="margin-left: 12px; font-weight: 500;">${stat.total}</span>`
     if (hasKeyFailure) {
-      html += `<span style="margin-left: 6px; color: #ef4444; font-size: 11px;">(${stat.failure}失败, ${failureRate}%)</span>`
+      html += `<span style="margin-left: 6px; color: #ef4444; font-size: 11px;">(${stat.failure} ${t('chart.failed')}, ${failureRate}%)</span>`
     }
     html += `</div>`
   })
@@ -634,9 +636,9 @@ const buildTrafficTooltip = ({ seriesIndex, dataPointIndex, w }: any): string =>
   // 汇总行（如果有多个 key）
   if (keyStats.length > 1) {
     html += `<div style="border-top: 1px solid rgba(128,128,128,0.3); margin-top: 6px; padding-top: 6px; font-weight: 600;">`
-    html += `<span>合计: ${grandTotal} 请求</span>`
+    html += `<span>${t('chart.total')}: ${grandTotal} ${t('chart.requestUnit')}</span>`
     if (hasFailure) {
-      html += `<span style="color: #ef4444; margin-left: 8px;">${grandFailure} 失败 (${grandFailureRate}%)</span>`
+      html += `<span style="color: #ef4444; margin-left: 8px;">${grandFailure} ${t('chart.failed')} (${grandFailureRate}%)</span>`
     }
     html += `</div>`
   }
@@ -745,7 +747,7 @@ const refreshData = async (isAutoRefresh = false) => {
     if (requestId !== refreshRequestId) return
 
     console.error('Failed to fetch key metrics history:', error)
-    errorMessage.value = error instanceof Error ? error.message : '获取 Key 历史数据失败'
+    errorMessage.value = error instanceof Error ? error.message : t('chart.keyHistoryLoadFailed')
     showError.value = true
     historyData.value = null
   } finally {

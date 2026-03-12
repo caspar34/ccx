@@ -4,7 +4,7 @@
     <v-snackbar v-model="showError" color="error" :timeout="3000" location="top">
       {{ errorMessage }}
       <template #actions>
-        <v-btn variant="text" @click="showError = false">关闭</v-btn>
+        <v-btn variant="text" @click="showError = false">{{ t('chart.close') }}</v-btn>
       </template>
     </v-snackbar>
 
@@ -13,10 +13,10 @@
       <div class="d-flex align-center ga-2">
         <!-- Duration selector -->
         <v-btn-toggle v-model="selectedDuration" mandatory density="compact" variant="outlined" divided :disabled="isLoading">
-          <v-btn value="1h" size="x-small">1小时</v-btn>
-          <v-btn value="6h" size="x-small">6小时</v-btn>
-          <v-btn value="24h" size="x-small">24小时</v-btn>
-          <v-btn value="today" size="x-small">今日</v-btn>
+          <v-btn value="1h" size="x-small">{{ t('chart.1h') }}</v-btn>
+          <v-btn value="6h" size="x-small">{{ t('chart.6h') }}</v-btn>
+          <v-btn value="24h" size="x-small">{{ t('chart.24h') }}</v-btn>
+          <v-btn value="today" size="x-small">{{ t('chart.today') }}</v-btn>
         </v-btn-toggle>
 
         <v-btn icon size="x-small" variant="text" :loading="isLoading" :disabled="isLoading" @click="refreshData">
@@ -28,11 +28,11 @@
       <v-btn-toggle v-model="selectedView" mandatory density="compact" variant="outlined" divided :disabled="isLoading">
         <v-btn value="traffic" size="x-small">
           <v-icon size="small" class="mr-1">mdi-chart-line</v-icon>
-          流量
+          {{ t('chart.traffic') }}
         </v-btn>
         <v-btn value="tokens" size="x-small">
           <v-icon size="small" class="mr-1">mdi-chart-areaspline</v-icon>
-          Token
+          {{ t('chart.tokens') }}
         </v-btn>
       </v-btn-toggle>
     </div>
@@ -40,33 +40,33 @@
     <!-- Summary cards -->
     <div v-if="summary && !compact" class="summary-cards d-flex flex-wrap ga-2 mb-3">
       <div class="summary-card">
-        <div class="summary-label">总请求</div>
+        <div class="summary-label">{{ t('chart.totalRequests') }}</div>
         <div class="summary-value">{{ formatNumber(summary.totalRequests) }}</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">成功率</div>
+        <div class="summary-label">{{ t('chart.successRate') }}</div>
         <div class="summary-value" :class="{ 'text-success': summary.avgSuccessRate >= 95, 'text-warning': summary.avgSuccessRate >= 80 && summary.avgSuccessRate < 95, 'text-error': summary.avgSuccessRate < 80 }">
           {{ summary.avgSuccessRate.toFixed(1) }}%
         </div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">输入 Token</div>
+        <div class="summary-label">{{ t('chart.inputTokens') }}</div>
         <div class="summary-value">{{ formatNumber(summary.totalInputTokens) }}</div>
       </div>
       <div class="summary-card">
-        <div class="summary-label">输出 Token</div>
+        <div class="summary-label">{{ t('chart.outputTokens') }}</div>
         <div class="summary-value">{{ formatNumber(summary.totalOutputTokens) }}</div>
       </div>
     </div>
 
     <!-- Compact summary (single line) -->
     <div v-if="summary && compact" class="compact-summary d-flex align-center ga-3 mb-2 text-caption">
-      <span><strong>{{ formatNumber(summary.totalRequests) }}</strong> 请求</span>
+      <span><strong>{{ formatNumber(summary.totalRequests) }}</strong> {{ t('orchestration.requests') }}</span>
       <span :class="{ 'text-success': summary.avgSuccessRate >= 95, 'text-warning': summary.avgSuccessRate >= 80 && summary.avgSuccessRate < 95, 'text-error': summary.avgSuccessRate < 80 }">
-        <strong>{{ summary.avgSuccessRate.toFixed(1) }}%</strong> 成功
+        <strong>{{ summary.avgSuccessRate.toFixed(1) }}%</strong> {{ t('chart.success') }}
       </span>
-      <span><strong>{{ formatNumber(summary.totalInputTokens) }}</strong> 输入</span>
-      <span><strong>{{ formatNumber(summary.totalOutputTokens) }}</strong> 输出</span>
+      <span><strong>{{ formatNumber(summary.totalInputTokens) }}</strong> {{ t('chart.input') }}</span>
+      <span><strong>{{ formatNumber(summary.totalOutputTokens) }}</strong> {{ t('chart.output') }}</span>
     </div>
 
     <!-- Loading state -->
@@ -77,7 +77,7 @@
     <!-- Empty state -->
     <div v-else-if="!hasData" class="d-flex flex-column justify-center align-center text-medium-emphasis" :style="{ height: chartHeight + 'px' }">
       <v-icon size="40" color="grey-lighten-1">mdi-chart-timeline-variant</v-icon>
-      <div class="text-caption mt-2">选定时间范围内没有请求记录</div>
+      <div class="text-caption mt-2">{{ t('chart.noRequestsInRange') }}</div>
     </div>
 
     <!-- Chart -->
@@ -99,6 +99,7 @@ import { useTheme } from 'vuetify'
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
 import { api, type GlobalStatsHistoryResponse, type GlobalHistoryDataPoint as _GlobalHistoryDataPoint, type GlobalStatsSummary, type ModelHistoryDataPoint } from '../services/api'
+import { useI18n } from '../i18n'
 
 // Register apexchart component
 const apexchart = VueApexCharts
@@ -110,6 +111,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   compact: false
 })
+const { t } = useI18n()
 
 // Types
 type ViewMode = 'traffic' | 'tokens'
@@ -351,7 +353,7 @@ const chartOptions = computed<ApexOptions>(() => {
     },
     yaxis: mode === 'tokens' ? [
       {
-        seriesName: '输入 Token',
+        seriesName: t('chart.inputTokens'),
         labels: {
           formatter: (val: number) => formatNumber(val),
           style: { fontSize: '11px' }
@@ -359,7 +361,7 @@ const chartOptions = computed<ApexOptions>(() => {
         min: 0
       },
       {
-        seriesName: '输出 Token',
+        seriesName: t('chart.outputTokens'),
         opposite: true,
         labels: {
           formatter: (val: number) => formatNumber(val),
@@ -380,7 +382,7 @@ const chartOptions = computed<ApexOptions>(() => {
       },
       y: {
         formatter: (val: number) => mode === 'traffic'
-          ? `${Math.round(val)} 请求`
+          ? `${Math.round(val)} ${t('chart.requestUnit')}`
           : formatNumber(val)
       },
       custom: mode === 'traffic' ? buildTrafficTooltip : undefined
@@ -430,16 +432,16 @@ const buildTrafficTooltip = ({ dataPointIndex }: any): string => {
       html += `<span style="flex: 1;">${escapeHtml(model.name)}</span>`
       html += `<span style="margin-left: 12px; font-weight: 500;">${mdp.requestCount}</span>`
       if (hasModelFailure) {
-        html += `<span style="margin-left: 6px; color: #ef4444; font-size: 11px;">(${mdp.failureCount}失败, ${failRate}%)</span>`
+        html += `<span style="margin-left: 6px; color: #ef4444; font-size: 11px;">(${mdp.failureCount} ${t('chart.failed')}, ${failRate}%)</span>`
       }
       html += `</div>`
     })
     // 合计行
     const grandFailureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
     html += `<div style="border-top: 1px solid rgba(128,128,128,0.3); margin-top: 6px; padding-top: 6px; font-weight: 600;">`
-    html += `<span>合计: ${dp.requestCount} 请求</span>`
+    html += `<span>${t('chart.total')}: ${dp.requestCount} ${t('chart.requestUnit')}</span>`
     if (hasFailure) {
-      html += `<span style="color: #ef4444; margin-left: 8px;">${dp.failureCount} 失败 (${grandFailureRate}%)</span>`
+      html += `<span style="color: #ef4444; margin-left: 8px;">${dp.failureCount} ${t('chart.failed')} (${grandFailureRate}%)</span>`
     }
     html += `</div>`
   } else {
@@ -447,11 +449,11 @@ const buildTrafficTooltip = ({ dataPointIndex }: any): string => {
     const failureRate = dp.requestCount > 0 ? (dp.failureCount / dp.requestCount * 100).toFixed(1) : '0'
     html += `<div style="display: flex; align-items: center; margin: 4px 0;">`
     html += `<span style="width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></span>`
-    html += `<span style="flex: 1;">总请求</span>`
+    html += `<span style="flex: 1;">${t('chart.totalRequests')}</span>`
     html += `<span style="margin-left: 12px; font-weight: 500;">${dp.requestCount}</span>`
     html += `</div>`
     if (hasFailure) {
-      html += `<div style="color: #ef4444; font-size: 11px; margin-top: 4px;">${dp.failureCount} 失败 (${failureRate}%)</div>`
+      html += `<div style="color: #ef4444; font-size: 11px; margin-top: 4px;">${dp.failureCount} ${t('chart.failed')} (${failureRate}%)</div>`
     }
   }
 
@@ -480,7 +482,7 @@ const chartSeries = computed(() => {
     }
     return [
       {
-        name: '请求',
+        name: t('status.metrics.requests'),
         data: dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.requestCount
@@ -490,14 +492,14 @@ const chartSeries = computed(() => {
   } else {
     return [
       {
-        name: '输入 Token',
+        name: t('chart.inputTokens'),
         data: dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.inputTokens
         }))
       },
       {
-        name: '输出 Token',
+        name: t('chart.outputTokens'),
         data: dataPoints.map(dp => ({
           x: new Date(dp.timestamp).getTime(),
           y: dp.outputTokens
@@ -543,7 +545,7 @@ const refreshData = async (isAutoRefresh = false) => {
     }
   } catch (error) {
     console.error('Failed to fetch global stats:', error)
-    errorMessage.value = error instanceof Error ? error.message : '获取全局统计数据失败'
+    errorMessage.value = error instanceof Error ? error.message : t('chart.globalStatsLoadFailed')
     showError.value = true
     historyData.value = null
   } finally {

@@ -9,7 +9,7 @@
       <v-card-title class="d-flex align-center justify-space-between pa-4">
         <div class="d-flex align-center ga-2">
           <v-icon color="success">mdi-test-tube</v-icon>
-          <span>能力测试 - {{ channelName }}</span>
+          <span>{{ t('capability.title', { channel: channelName }) }}</span>
         </div>
         <v-btn icon variant="text" @click="$emit('update:modelValue', false)">
           <v-icon>mdi-close</v-icon>
@@ -22,8 +22,8 @@
         <!-- 加载状态 -->
         <div v-if="state === 'loading'" class="d-flex flex-column align-center py-8">
           <v-progress-circular indeterminate size="48" color="primary" />
-          <p class="text-body-1 mt-4 text-medium-emphasis">正在测试协议兼容性...</p>
-          <p class="text-caption text-medium-emphasis">这可能需要几秒钟</p>
+          <p class="text-body-1 mt-4 text-medium-emphasis">{{ t('capability.loadingTitle') }}</p>
+          <p class="text-caption text-medium-emphasis">{{ t('capability.loadingBody') }}</p>
         </div>
 
         <!-- 错误状态 -->
@@ -37,7 +37,7 @@
         <div v-else-if="state === 'result' && result">
           <!-- 兼容协议总览 -->
           <div class="mb-4">
-            <div class="text-body-2 font-weight-medium mb-2">兼容协议</div>
+            <div class="text-body-2 font-weight-medium mb-2">{{ t('capability.compatibleProtocols') }}</div>
             <div class="d-flex flex-wrap ga-2">
               <v-chip
                 v-for="proto in result.compatibleProtocols"
@@ -50,7 +50,7 @@
                 {{ getProtocolDisplayName(proto) }}
               </v-chip>
               <v-chip v-if="result.compatibleProtocols.length === 0" color="grey" size="small" variant="tonal">
-                无兼容协议
+                {{ t('capability.noCompatibleProtocols') }}
               </v-chip>
             </div>
           </div>
@@ -59,12 +59,12 @@
           <v-table density="comfortable" class="rounded-lg">
             <thead>
               <tr>
-                <th>协议</th>
-                <th>状态</th>
-                <th>测试模型</th>
-                <th>延迟</th>
-                <th>流式</th>
-                <th>操作</th>
+                <th>{{ t('capability.table.protocol') }}</th>
+                <th>{{ t('capability.table.status') }}</th>
+                <th>{{ t('capability.table.testModel') }}</th>
+                <th>{{ t('capability.table.latency') }}</th>
+                <th>{{ t('capability.table.streaming') }}</th>
+                <th>{{ t('capability.table.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -77,13 +77,13 @@
                 <td>
                   <div v-if="test.success" class="d-flex align-center ga-1">
                     <v-icon color="success" size="small">mdi-check-circle</v-icon>
-                    <span class="text-body-2 text-success">成功</span>
+                    <span class="text-body-2 text-success">{{ t('capability.success') }}</span>
                   </div>
-                  <v-tooltip v-else :text="test.error || '测试失败'" location="top" content-class="error-tooltip">
+                  <v-tooltip v-else :text="test.error || t('capability.failedTooltip')" location="top" content-class="error-tooltip">
                     <template #activator="{ props }">
                       <div v-bind="props" class="d-flex align-center ga-1">
                         <v-icon color="error" size="small">mdi-close-circle</v-icon>
-                        <span class="text-body-2 text-error">失败</span>
+                        <span class="text-body-2 text-error">{{ t('capability.failed') }}</span>
                       </div>
                     </template>
                   </v-tooltip>
@@ -99,11 +99,11 @@
                 <td>
                   <div v-if="test.success && test.streamingSupported" class="d-flex align-center ga-1">
                     <v-icon color="success" size="small">mdi-check-circle</v-icon>
-                    <span class="text-body-2 text-success">支持</span>
+                    <span class="text-body-2 text-success">{{ t('capability.supported') }}</span>
                   </div>
                   <div v-else-if="test.success" class="d-flex align-center ga-1">
                     <v-icon color="warning" size="small">mdi-minus-circle</v-icon>
-                    <span class="text-body-2 text-warning">不支持</span>
+                    <span class="text-body-2 text-warning">{{ t('capability.unsupported') }}</span>
                   </div>
                   <span v-else class="text-body-2 text-medium-emphasis">-</span>
                 </td>
@@ -117,15 +117,15 @@
                     rounded="lg"
                     @click="$emit('copyToTab', test.protocol)"
                   >
-                    复制到此 Tab
+                    {{ t('capability.copyToTab') }}
                   </v-btn>
                   <!-- 成功 + 当前 Tab → 当前 Tab 标记 -->
                   <v-chip v-else-if="test.success && test.protocol === currentTab" size="x-small" color="grey" variant="tonal">
-                    当前 Tab
+                    {{ t('capability.currentTab') }}
                   </v-chip>
                   <!-- 失败 + 当前 Tab → 当前 Tab 标记（灰色） -->
                   <v-chip v-else-if="!test.success && test.protocol === currentTab" size="x-small" color="grey" variant="tonal">
-                    当前 Tab
+                    {{ t('capability.currentTab') }}
                   </v-chip>
                   <!-- 失败 + 非当前 Tab → 为每个成功协议显示转换按钮 -->
                   <div v-else-if="!test.success && test.protocol !== currentTab" class="d-flex flex-wrap ga-1">
@@ -138,7 +138,7 @@
                       rounded="lg"
                       @click="$emit('copyToTab', test.protocol)"
                     >
-                      {{ getProtocolDisplayName(successProto) }} 转换
+                      {{ t('capability.convert', { protocol: getProtocolDisplayName(successProto) }) }}
                     </v-btn>
                   </div>
                 </td>
@@ -148,7 +148,7 @@
 
           <!-- 总耗时 -->
           <div class="text-caption text-medium-emphasis mt-3 text-right">
-            总耗时: {{ result.totalDuration }}ms
+            {{ t('capability.totalDuration', { duration: result.totalDuration }) }}
           </div>
         </div>
       </v-card-text>
@@ -159,6 +159,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { CapabilityTestResult } from '../services/api'
+import { useI18n } from '../i18n'
 
 interface Props {
   modelValue: boolean
@@ -171,6 +172,8 @@ defineEmits<{
   'update:modelValue': [value: boolean]
   'copyToTab': [protocol: string]
 }>()
+
+const { t } = useI18n()
 
 // 状态管理
 const state = ref<'loading' | 'error' | 'result'>('loading')

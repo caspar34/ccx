@@ -7,10 +7,10 @@
         </v-avatar>
         <div class="flex-grow-1">
           <div class="text-h5 font-weight-bold">
-            {{ isEditing ? '编辑渠道' : '添加新渠道' }}
+            {{ isEditing ? t('addChannel.editTitle') : t('addChannel.createTitle') }}
           </div>
           <div class="text-body-2" :class="subtitleClasses">
-            {{ isEditing ? '修改渠道配置信息' : isQuickMode ? '快速批量添加 API 密钥' : '配置API渠道信息和密钥' }}
+            {{ isEditing ? t('addChannel.editSubtitle') : isQuickMode ? t('addChannel.quickSubtitle') : t('addChannel.fullSubtitle') }}
           </div>
         </div>
         <!-- 能力测试按钮（仅在编辑模式显示） -->
@@ -21,12 +21,12 @@
           prepend-icon="mdi-test-tube"
           @click="handleTestCapability"
         >
-          能力测试
+          {{ t('addChannel.testCapability') }}
         </v-btn>
         <!-- 模式切换按钮（仅在添加模式显示） -->
         <v-btn v-if="!isEditing" variant="outlined" size="small" class="mode-toggle-btn" @click="toggleMode">
           <v-icon start size="16">{{ isQuickMode ? 'mdi-form-textbox' : 'mdi-lightning-bolt' }}</v-icon>
-          {{ isQuickMode ? '详细配置' : '快速添加' }}
+          {{ isQuickMode ? t('addChannel.detailedMode') : t('addChannel.quickMode') }}
         </v-btn>
       </v-card-title>
 
@@ -35,8 +35,8 @@
         <div v-if="!isEditing && isQuickMode">
           <v-textarea
             v-model="quickInput"
-            label="输入内容"
-            placeholder="每行输入一个 API Key 或 Base URL&#10;&#10;示例:&#10;sk-xxx-your-api-key&#10;sk-yyy-another-key&#10;https://api.example.com/v1"
+            :label="t('addChannel.quickInputLabel')"
+            :placeholder="t('addChannel.quickInputPlaceholder')"
             variant="outlined"
             rows="10"
             no-resize
@@ -55,19 +55,19 @@
                     {{ detectedBaseUrls.length > 0 ? 'mdi-check-circle' : 'mdi-alert-circle' }}
                   </v-icon>
                   <div class="flex-grow-1">
-                    <div class="text-body-2 font-weight-medium">Base URL</div>
+                    <div class="text-body-2 font-weight-medium">{{ t('addChannel.baseUrl') }}</div>
                     <div v-if="detectedBaseUrls.length === 0" class="text-caption text-error">
-                      请输入一个有效的 URL (https://...)
+                      {{ t('addChannel.enterValidUrl') }}
                     </div>
                     <div v-else class="d-flex flex-column ga-2 mt-1">
                       <div v-for="url in detectedBaseUrls" :key="url" class="base-url-item">
                         <div class="text-caption text-success">{{ url }}</div>
-                        <div class="text-caption text-medium-emphasis">预期请求: {{ getExpectedRequestUrl(url) }}</div>
+                        <div class="text-caption text-medium-emphasis">{{ t('addChannel.expectedRequest') }} {{ getExpectedRequestUrl(url) }}</div>
                       </div>
                     </div>
                   </div>
                   <v-chip v-if="detectedBaseUrls.length > 0" size="x-small" color="success" variant="tonal">
-                    {{ detectedBaseUrls.length }} 个
+                    {{ t('addChannel.count', { count: detectedBaseUrls.length }) }}
                   </v-chip>
                 </div>
 
@@ -77,17 +77,17 @@
                     {{ detectedApiKeys.length > 0 ? 'mdi-check-circle' : 'mdi-alert-circle' }}
                   </v-icon>
                   <div class="flex-grow-1">
-                    <div class="text-body-2 font-weight-medium">API 密钥</div>
+                    <div class="text-body-2 font-weight-medium">{{ t('addChannel.apiKeys') }}</div>
                     <div class="text-caption" :class="detectedApiKeys.length > 0 ? 'text-success' : 'text-error'">
                       {{
                         detectedApiKeys.length > 0
-                          ? `已检测到 ${detectedApiKeys.length} 个密钥`
-                          : '请至少输入一个 API Key'
+                          ? t('addChannel.detectedKeys', { count: detectedApiKeys.length })
+                          : t('addChannel.enterApiKey')
                       }}
                     </div>
                   </div>
                   <v-chip v-if="detectedApiKeys.length > 0" size="x-small" color="success" variant="tonal">
-                    {{ detectedApiKeys.length }} 个
+                    {{ t('addChannel.count', { count: detectedApiKeys.length }) }}
                   </v-chip>
                 </div>
 
@@ -95,19 +95,19 @@
                 <div class="d-flex align-center ga-3">
                   <v-icon color="primary" size="20">mdi-tag</v-icon>
                   <div class="flex-grow-1">
-                    <div class="text-body-2 font-weight-medium">渠道名称</div>
+                    <div class="text-body-2 font-weight-medium">{{ t('addChannel.channelName') }}</div>
                     <div class="text-caption text-primary font-weight-medium">
                       {{ generatedChannelName }}
                     </div>
                   </div>
-                  <v-chip size="x-small" color="primary" variant="tonal"> 自动生成 </v-chip>
+                  <v-chip size="x-small" color="primary" variant="tonal"> {{ t('common.autoGenerated') }} </v-chip>
                 </div>
 
                 <!-- 渠道类型提示 -->
                 <div class="d-flex align-center ga-3">
                   <v-icon color="info" size="20">mdi-information</v-icon>
                   <div class="flex-grow-1">
-                    <div class="text-body-2 font-weight-medium">渠道类型</div>
+                    <div class="text-body-2 font-weight-medium">{{ t('addChannel.channelType') }}</div>
                     <div class="text-caption text-medium-emphasis">
                       {{ props.channelType === 'chat' ? 'OpenAI Chat' : props.channelType === 'gemini' ? 'Gemini' : props.channelType === 'responses' ? 'Responses (Codex)' : 'Claude (Messages)' }} -
                       {{ getDefaultServiceType() }}
@@ -126,8 +126,8 @@
             <v-col cols="12" md="6">
               <v-text-field
                 v-model="form.name"
-                label="渠道名称 *"
-                placeholder="例如：GPT-4 渠道"
+                :label="t('addChannel.nameLabel')"
+                :placeholder="t('addChannel.namePlaceholder')"
                 prepend-inner-icon="mdi-tag"
                 variant="outlined"
                 density="comfortable"
@@ -140,7 +140,7 @@
             <v-col cols="12" md="6">
               <v-select
                 v-model="form.serviceType"
-                label="服务类型 *"
+                :label="t('addChannel.serviceTypeLabel')"
                 :items="serviceTypeOptions"
                 prepend-inner-icon="mdi-cog"
                 variant="outlined"
@@ -155,8 +155,8 @@
             <v-col cols="12">
               <v-textarea
                 v-model="baseUrlsText"
-                label="基础URL *"
-                placeholder="每行一个 URL，支持多个 BaseURL&#10;例如：&#10;https://api.openai.com/v1&#10;https://api2.openai.com/v1"
+                :label="t('addChannel.baseUrlLabel')"
+                :placeholder="t('addChannel.baseUrlPlaceholder')"
                 prepend-inner-icon="mdi-web"
                 variant="outlined"
                 density="comfortable"
@@ -170,7 +170,7 @@
               <!-- 固定高度的提示区域，防止布局跳动；有错误时不显示 -->
               <div v-show="formExpectedRequestUrls.length > 0 && !baseUrlHasError" class="base-url-hint">
                 <div v-for="(item, index) in formExpectedRequestUrls" :key="index" class="expected-request-item">
-                  <span class="text-caption text-medium-emphasis"> 预期请求: {{ item.expectedUrl }} </span>
+                  <span class="text-caption text-medium-emphasis"> {{ t('addChannel.expectedRequest') }} {{ item.expectedUrl }} </span>
                 </div>
               </div>
             </v-col>
@@ -179,8 +179,8 @@
             <v-col cols="12">
               <v-text-field
                 v-model="form.website"
-                label="官网/控制台 (可选)"
-                placeholder="例如：https://platform.openai.com"
+                :label="t('addChannel.websiteLabel')"
+                :placeholder="t('addChannel.websitePlaceholder')"
                 prepend-inner-icon="mdi-open-in-new"
                 variant="outlined"
                 density="comfortable"
@@ -196,20 +196,20 @@
                 <v-card-title class="d-flex align-center justify-space-between pa-4 pb-2">
                   <div class="d-flex align-center ga-2">
                     <v-icon color="primary">mdi-swap-horizontal</v-icon>
-                    <span class="text-body-1 font-weight-bold">模型重定向 (可选)</span>
+                    <span class="text-body-1 font-weight-bold">{{ t('addChannel.modelRedirect') }}</span>
                   </div>
-                  <v-chip size="small" color="secondary" variant="tonal"> 自动转换模型名称 </v-chip>
+                  <v-chip size="small" color="secondary" variant="tonal"> {{ t('addChannel.autoConvertModelNames') }} </v-chip>
                 </v-card-title>
 
                 <v-card-text class="pt-2">
                   <div class="text-body-2 text-medium-emphasis mb-4">
                     {{ modelMappingHint }}
                     <br/>
-                    <span class="text-caption text-primary">💡 点击目标模型输入框会自动获取上游支持的模型列表,每个 API Key 的检测状态会显示在密钥列表中</span>
+                    <span class="text-caption text-primary">💡 {{ t('addChannel.modelHintTip') }}</span>
                   </div>
 
                   <div v-if="showModelMappingPresets" class="d-flex align-center flex-wrap ga-2 mb-4">
-                    <div class="text-caption text-medium-emphasis">一键设置</div>
+                    <div class="text-caption text-medium-emphasis">{{ t('addChannel.oneClickSetup') }}</div>
                     <v-btn
                       size="small"
                       variant="tonal"
@@ -274,14 +274,14 @@
                   <div class="d-flex align-center flex-wrap ga-2">
                     <v-combobox
                       v-model="newMapping.source"
-                      label="源模型名"
+                      :label="t('addChannel.sourceModelLabel')"
                       :items="sourceModelOptions"
                       variant="outlined"
                       density="comfortable"
                       hide-details
                       class="flex-1-1"
                       style="min-width: 160px"
-                      placeholder="选择或输入源模型名"
+                      :placeholder="t('addChannel.sourceModelPlaceholder')"
                       clearable
                       :error="!!sourceMappingError"
                       @update:model-value="handleSourceModelChange"
@@ -290,7 +290,7 @@
                     <v-icon color="primary">mdi-arrow-right</v-icon>
                     <v-combobox
                       v-model="newMapping.target"
-                      label="目标模型名"
+                      :label="t('addChannel.targetModelLabel')"
                       :placeholder="targetModelPlaceholder"
                       :items="targetModelOptions"
                       :loading="fetchingModels"
@@ -306,7 +306,7 @@
                     <v-select
                       v-if="supportsOpenAIAdvancedOptions"
                       v-model="newMapping.reasoningEffort"
-                      label="思考深度"
+                      :label="t('addChannel.reasoningEffortLabel')"
                       :items="reasoningEffortOptions"
                       variant="outlined"
                       density="comfortable"
@@ -320,7 +320,7 @@
                       :disabled="!isMappingInputValid"
                       @click="addModelMapping"
                     >
-                      添加
+                      {{ t('app.actions.add') }}
                     </v-btn>
                   </div>
                   <!-- 错误提示 -->
@@ -334,8 +334,8 @@
                     <v-col cols="12" md="6">
                       <div class="d-flex align-center justify-space-between h-100 advanced-switch-row">
                         <div>
-                          <div class="text-body-2 font-weight-medium">Fast 模式</div>
-                          <div class="text-caption text-medium-emphasis">开启后下发 service_tier=priority</div>
+                          <div class="text-body-2 font-weight-medium">{{ t('addChannel.fastMode') }}</div>
+                          <div class="text-caption text-medium-emphasis">{{ t('addChannel.fastModeHint') }}</div>
                         </div>
                         <v-switch
                           v-model="form.fastMode"
@@ -348,7 +348,7 @@
                     <v-col cols="12" md="6">
                       <v-select
                         v-model="form.textVerbosity"
-                        label="输出冗长度"
+                        :label="t('addChannel.textVerbosityLabel')"
                         :items="textVerbosityOptions"
                         variant="outlined"
                         density="comfortable"
@@ -365,10 +365,10 @@
             <v-col cols="12">
               <v-combobox
                 v-model="form.supportedModels"
-                label="支持的模型 (可选)"
-                placeholder="输入模型名称后按回车添加，如 gpt-4o、claude-*"
+                :label="t('addChannel.supportedModelsLabel')"
+                :placeholder="t('addChannel.supportedModelsPlaceholder')"
                 prepend-inner-icon="mdi-brain"
-                hint="匹配客户端请求的原始模型名（模型重定向发生在渠道选中之后）。留空表示支持所有模型。支持通配符，如 gpt-4* 匹配 gpt-4o、gpt-4-turbo 等"
+                :hint="t('addChannel.supportedModelsHint')"
                 persistent-hint
                 clearable
                 multiple
@@ -378,7 +378,7 @@
                 density="comfortable"
               />
               <div class="d-flex align-center flex-wrap ga-2 mt-2">
-                <div class="text-caption text-primary">常用过滤器</div>
+                <div class="text-caption text-primary">{{ t('addChannel.commonFilters') }}</div>
                 <v-chip
                   v-for="filter in commonSupportedModelFilters"
                   :key="filter"
@@ -398,12 +398,12 @@
                 <v-card-title class="d-flex align-center justify-space-between pa-4 pb-2">
                   <div class="d-flex align-center ga-2">
                     <v-icon :color="form.apiKeys.length > 0 ? 'primary' : 'error'">mdi-key</v-icon>
-                    <span class="text-body-1 font-weight-bold">API密钥管理 *</span>
+                    <span class="text-body-1 font-weight-bold">{{ t('channelCard.apiKeyManagement') }} *</span>
                     <v-chip v-if="form.apiKeys.length === 0" size="x-small" color="error" variant="tonal">
-                      至少需要一个密钥
+                      {{ t('addChannel.apiKeyRequired') }}
                     </v-chip>
                   </div>
-                  <v-chip size="small" color="info" variant="tonal"> 可添加多个密钥用于负载均衡 </v-chip>
+                  <v-chip size="small" color="info" variant="tonal"> {{ t('addChannel.apiKeyLoadBalance') }} </v-chip>
                 </v-card-title>
 
                 <v-card-text class="pt-2">
@@ -437,7 +437,7 @@
                                 variant="tonal"
                               >
                                 <v-icon start size="12">mdi-loading</v-icon>
-                                检测中...
+                                {{ t('addChannel.checking') }}
                               </v-chip>
                               <v-chip
                                 v-else-if="keyModelsStatus.get(key)?.success"
@@ -445,7 +445,7 @@
                                 color="success"
                                 variant="tonal"
                               >
-                                models {{ keyModelsStatus.get(key)?.statusCode }} ({{ keyModelsStatus.get(key)?.modelCount }} 个)
+                                {{ t('addChannel.modelsCount', { statusCode: keyModelsStatus.get(key)?.statusCode ?? 'OK', count: keyModelsStatus.get(key)?.modelCount ?? 0 }) }}
                               </v-chip>
                               <v-tooltip
                                 v-else-if="keyModelsStatus.get(key)?.error"
@@ -467,7 +467,7 @@
                               </v-tooltip>
                               <!-- 重复密钥标签 -->
                               <v-chip v-if="duplicateKeyIndex === index" size="x-small" color="error" variant="text">
-                                重复密钥
+                                {{ t('addChannel.duplicateKey') }}
                               </v-chip>
                             </div>
                           </div>
@@ -478,7 +478,7 @@
                             <!-- 置顶/置底：仅首尾密钥显示 -->
                             <v-tooltip
                               v-if="index === form.apiKeys.length - 1 && form.apiKeys.length > 1"
-                              text="置顶"
+                              :text="t('channelCard.moveTop')"
                               location="top"
                               :open-delay="150"
                               content-class="key-tooltip"
@@ -499,7 +499,7 @@
                             </v-tooltip>
                             <v-tooltip
                               v-if="index === 0 && form.apiKeys.length > 1"
-                              text="置底"
+                              :text="t('channelCard.moveBottom')"
                               location="top"
                               :open-delay="150"
                               content-class="key-tooltip"
@@ -519,7 +519,7 @@
                               </template>
                             </v-tooltip>
                             <v-tooltip
-                              :text="copiedKeyIndex === index ? '已复制!' : '复制密钥'"
+                              :text="copiedKeyIndex === index ? t('channelCard.copied') : t('channelCard.copyKey')"
                               location="top"
                               :open-delay="150"
                               content-class="key-tooltip"
@@ -539,7 +539,7 @@
                                 </v-btn>
                               </template>
                             </v-tooltip>
-                            <v-tooltip text="删除密钥" location="top" :open-delay="150" content-class="key-tooltip">
+                            <v-tooltip :text="t('addChannel.deleteKey')" location="top" :open-delay="150" content-class="key-tooltip">
                               <template #activator="{ props: tooltipProps }">
                                 <v-btn
                                   v-bind="tooltipProps"
@@ -563,8 +563,8 @@
                   <div class="d-flex align-start ga-3">
                     <v-text-field
                       v-model="newApiKey"
-                      label="添加新的API密钥"
-                      placeholder="输入完整的API密钥"
+                      :label="t('addChannel.addNewApiKey')"
+                      :placeholder="t('addChannel.addNewApiKeyPlaceholder')"
                       prepend-inner-icon="mdi-plus"
                       variant="outlined"
                       density="comfortable"
@@ -584,7 +584,7 @@
                       class="mt-1"
                       @click="addApiKey"
                     >
-                      添加
+                      {{ t('app.actions.add') }}
                     </v-btn>
                   </div>
                 </v-card-text>
@@ -595,8 +595,8 @@
             <v-col cols="12">
               <v-textarea
                 v-model="form.description"
-                label="描述 (可选)"
-                hint="可选的渠道描述..."
+                :label="t('addChannel.descriptionLabel')"
+                :hint="t('addChannel.descriptionHint')"
                 persistent-hint
                 prepend-inner-icon="mdi-text"
                 variant="outlined"
@@ -612,10 +612,8 @@
                 <div class="d-flex align-center ga-2">
                   <v-icon color="warning">mdi-shield-alert</v-icon>
                   <div>
-                    <div class="text-body-1 font-weight-medium">跳过 TLS 证书验证</div>
-                    <div class="text-caption text-medium-emphasis">
-                      仅在自签名或域名不匹配时临时启用，生产环境请关闭
-                    </div>
+                    <div class="text-body-1 font-weight-medium">{{ t('addChannel.skipTlsLabel') }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ t('addChannel.skipTlsHint') }}</div>
                   </div>
                 </div>
                 <v-switch v-model="form.insecureSkipVerify" inset color="warning" hide-details />
@@ -628,10 +626,8 @@
                 <div class="d-flex align-center ga-2">
                   <v-icon color="info">mdi-speedometer-slow</v-icon>
                   <div>
-                    <div class="text-body-1 font-weight-medium">低质量渠道</div>
-                    <div class="text-caption text-medium-emphasis">
-                      启用后强制本地估算 token 数量，偏差超过 5% 时使用本地值
-                    </div>
+                    <div class="text-body-1 font-weight-medium">{{ t('addChannel.lowQualityLabel') }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ t('addChannel.lowQualityHint') }}</div>
                   </div>
                 </div>
                 <v-switch v-model="form.lowQuality" inset color="info" hide-details />
@@ -644,10 +640,8 @@
                 <div class="d-flex align-center ga-2">
                   <v-icon color="secondary">mdi-signature</v-icon>
                   <div>
-                    <div class="text-body-1 font-weight-medium">注入 Dummy Thought Signature</div>
-                    <div class="text-caption text-medium-emphasis">
-                      为 functionCall 注入 dummy signature，兼容需要该字段的第三方 API（官方 API 请关闭）
-                    </div>
+                    <div class="text-body-1 font-weight-medium">{{ t('addChannel.injectDummyThoughtSignatureLabel') }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ t('addChannel.injectDummyThoughtSignatureHint') }}</div>
                   </div>
                 </div>
                 <v-switch v-model="form.injectDummyThoughtSignature" inset color="secondary" hide-details />
@@ -660,10 +654,8 @@
                 <div class="d-flex align-center ga-2">
                   <v-icon color="error">mdi-close-circle</v-icon>
                   <div>
-                    <div class="text-body-1 font-weight-medium">移除 Thought Signature</div>
-                    <div class="text-caption text-medium-emphasis">
-                      移除 functionCall 的 thought_signature 字段，兼容不支持该字段的旧版 Gemini API
-                    </div>
+                    <div class="text-body-1 font-weight-medium">{{ t('addChannel.stripThoughtSignatureLabel') }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ t('addChannel.stripThoughtSignatureHint') }}</div>
                   </div>
                 </div>
                 <v-switch v-model="form.stripThoughtSignature" inset color="error" hide-details />
@@ -675,11 +667,11 @@
               <v-card variant="outlined">
                 <v-card-title class="text-body-1 d-flex align-center ga-2">
                   <v-icon size="small">mdi-web</v-icon>
-                  自定义请求头 (可选)
+                  {{ t('addChannel.customHeadersLabel') }}
                 </v-card-title>
                 <v-card-text>
                   <div class="text-caption text-medium-emphasis mb-3">
-                    添加或覆盖发送到上游的 HTTP 请求头
+                    {{ t('addChannel.customHeadersHint') }}
                   </div>
 
                   <!-- 已添加的请求头列表 -->
@@ -711,7 +703,7 @@
                   <div class="d-flex ga-2 align-center">
                     <v-text-field
                       v-model="newHeaderKey"
-                      label="Header 名称"
+                      :label="t('addChannel.headerNameLabel')"
                       placeholder="X-Custom-Header"
                       variant="outlined"
                       density="compact"
@@ -720,7 +712,7 @@
                     />
                     <v-text-field
                       v-model="newHeaderValue"
-                      label="Header 值"
+                      :label="t('addChannel.headerValueLabel')"
                       placeholder="value"
                       variant="outlined"
                       density="compact"
@@ -744,10 +736,10 @@
             <v-col cols="12">
               <v-text-field
                 v-model="form.proxyUrl"
-                label="代理 URL (可选)"
-                placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                :label="t('addChannel.proxyUrlLabel')"
+                :placeholder="t('addChannel.proxyUrlPlaceholder')"
                 prepend-inner-icon="mdi-shield-lock-outline"
-                hint="支持 HTTP/HTTPS/SOCKS5 代理，用于通过代理访问上游服务"
+                :hint="t('addChannel.proxyUrlHint')"
                 persistent-hint
                 clearable
                 variant="outlined"
@@ -761,7 +753,7 @@
 
       <v-card-actions class="pa-6 pt-0">
         <v-spacer />
-        <v-btn variant="text" @click="handleCancel"> 取消 </v-btn>
+        <v-btn variant="text" @click="handleCancel"> {{ t('app.actions.cancel') }} </v-btn>
         <v-btn
           v-if="!isEditing && isQuickMode"
           color="primary"
@@ -770,7 +762,7 @@
           prepend-icon="mdi-check"
           @click="handleQuickSubmit"
         >
-          创建渠道
+          {{ t('addChannel.createChannel') }}
         </v-btn>
         <v-btn
           v-else
@@ -780,7 +772,7 @@
           prepend-icon="mdi-check"
           @click="handleSubmit"
         >
-          {{ isEditing ? '更新渠道' : '创建渠道' }}
+          {{ isEditing ? t('addChannel.updateChannel') : t('addChannel.createChannel') }}
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -800,6 +792,7 @@ import {
 import { buildExpectedRequestUrls } from '../utils/expectedRequestUrls'
 import { supportsAdvancedChannelOptions } from '../utils/channelAdvancedOptions'
 import { buildChannelPayload } from '../utils/channelPayload'
+import { useI18n } from '../i18n'
 
 interface Props {
   show: boolean
@@ -816,6 +809,7 @@ const emit = defineEmits<{
   save: [channel: Omit<Channel, 'index' | 'latency' | 'status'>, options?: { isQuickAdd?: boolean }]
   testCapability: [channelId: number]
 }>()
+const { t } = useI18n()
 
 // 主题
 const theme = useTheme()
@@ -1171,33 +1165,33 @@ const sourceModelOptions = computed(() => {
 // 模型重定向的示例文本 - 根据渠道类型动态显示
 const modelMappingHint = computed(() => {
   if (props.channelType === 'chat') {
-    return '配置模型名称映射，将请求中的模型名重定向到目标模型。例如：将 "gpt-4o" 重定向到 "gpt-5.4"'
+    return t('addChannel.modelMappingHintChat')
   }
   if (props.channelType === 'gemini') {
-    return '配置模型名称映射，将请求中的模型名重定向到目标模型。例如：将 "gemini-pro" 重定向到 "gemini-3-pro"'
+    return t('addChannel.modelMappingHintGemini')
   }
   if (props.channelType === 'responses') {
-    return '配置模型名称映射，将请求中的模型名重定向到目标模型。例如：将 "opus" 重定向到 "gpt-5.4"'
+    return t('addChannel.modelMappingHintResponses')
   } else {
-    return '配置模型名称映射，将请求中的模型名重定向到目标模型。例如：将 "opus" 重定向到 "claude-sonnet-4-5-20250929"'
+    return t('addChannel.modelMappingHintMessages')
   }
 })
 
 const targetModelPlaceholder = computed(() => {
   if (props.channelType === 'chat') {
-    return '例如：gpt-5.4'
+    return t('addChannel.targetModelPlaceholderChat')
   }
   if (props.channelType === 'responses') {
-    return '例如：gpt-5.4'
+    return t('addChannel.targetModelPlaceholderResponses')
   }
   if (props.channelType === 'gemini') {
-    return '例如：gemini-3.1-pro'
+    return t('addChannel.targetModelPlaceholderGemini')
   }
-  return '例如：claude-opus-4-6'
+  return t('addChannel.targetModelPlaceholderMessages')
 })
 
 const reasoningEffortOptions = [
-  { title: '未设置（默认）', value: '' },
+  { title: t('addChannel.reasoningDefault'), value: '' },
   { title: 'None', value: 'none' },
   { title: 'Low', value: 'low' },
   { title: 'Medium', value: 'medium' },
@@ -1418,9 +1412,9 @@ const isPresetSourceModel = (val: string): boolean => {
 // 验证源模型名称（仅允许合法的模型名：字母、数字、连字符、下划线、点、斜杠）
 const validateSourceModelName = (val: string): string => {
   if (!val) return ''
-  if (!isPresetSourceModel(val) && val.length > 50) return '自定义模型名过长（最多 50 字符）'
-  if (/\s/.test(val)) return '模型名不能包含空格'
-  if (!/^[\w.\-/:@+]+$/.test(val)) return '模型名只能包含字母、数字、连字符、下划线、点、斜杠、冒号、@ 和 +'
+  if (!isPresetSourceModel(val) && val.length > 50) return t('addChannel.sourceModelNameTooLong')
+  if (/\s/.test(val)) return t('addChannel.sourceModelNoSpaces')
+  if (!/^[\w.\-/:@+]+$/.test(val)) return t('addChannel.sourceModelInvalidChars')
   return ''
 }
 
@@ -1458,13 +1452,13 @@ const errors = reactive({
 
 // 验证规则
 const rules = {
-  required: (value: string) => !!value || '此字段为必填项',
+  required: (value: string) => !!value || t('addChannel.fieldRequired'),
   url: (value: string) => {
     try {
       new URL(value)
       return true
     } catch {
-      return '请输入有效的URL'
+      return t('addChannel.invalidUrl')
     }
   },
   urlOptional: (value: string) => {
@@ -1473,21 +1467,21 @@ const rules = {
       new URL(value)
       return true
     } catch {
-      return '请输入有效的URL'
+      return t('addChannel.invalidUrl')
     }
   },
   baseUrls: (value: string) => {
-    if (!value) return '此字段为必填项'
+    if (!value) return t('addChannel.fieldRequired')
     const urls = value
       .split('\n')
       .map(s => s.trim())
       .filter(Boolean)
-    if (urls.length === 0) return '请至少输入一个 URL'
+    if (urls.length === 0) return t('addChannel.atLeastOneUrl')
     for (const url of urls) {
       try {
         new URL(url)
       } catch {
-        return `无效的 URL: ${url}`
+        return t('addChannel.invalidUrlValue', { url })
       }
     }
     return true
@@ -1658,7 +1652,7 @@ const addApiKey = () => {
   // 检查是否与现有密钥重复
   const duplicateIndex = findDuplicateKeyIndex(key)
   if (duplicateIndex !== -1) {
-    apiKeyError.value = '该密钥已存在'
+    apiKeyError.value = t('addChannel.duplicateKeyExists')
     duplicateKeyIndex.value = duplicateIndex
     // 清除输入框，让用户重新输入
     newApiKey.value = ''
@@ -1810,7 +1804,7 @@ const handleTargetModelClick = () => {
 
 const fetchTargetModels = async () => {
   if (!form.baseUrl || form.apiKeys.length === 0) {
-    fetchModelsError.value = '请先填写 Base URL 和至少一个 API Key'
+    fetchModelsError.value = t('addChannel.fillBaseUrlAndApiKey')
     return
   }
 
@@ -1874,7 +1868,7 @@ const fetchTargetModels = async () => {
       })
       return response.data as { id: string }[]
     } catch (error) {
-      let errorMsg = '未知错误'
+      let errorMsg = t('addChannel.unknownError')
       let statusCode = 0
       if (error instanceof ApiError) {
         errorMsg = error.message
@@ -1907,7 +1901,7 @@ const fetchTargetModels = async () => {
       return s && !s.success
     })
     if (allFailed) {
-      fetchModelsError.value = '所有 API Key 都无法获取模型列表，请检查 API 密钥列表中的错误信息'
+      fetchModelsError.value = t('addChannel.allApiKeysModelsFailed')
     }
   } finally {
     fetchingModels.value = false

@@ -2,15 +2,17 @@ package handlers
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"strings"
 
+	"github.com/BenedictKing/ccx/internal/config"
 	"github.com/gin-gonic/gin"
 )
 
 // ServeFrontend 提供前端静态文件服务
-func ServeFrontend(r *gin.Engine, frontendFS embed.FS) {
+func ServeFrontend(r *gin.Engine, frontendFS embed.FS, envCfg *config.EnvConfig) {
 	// 从嵌入的文件系统中提取 frontend/dist 子目录
 	distFS, err := fs.Sub(frontendFS, "frontend/dist")
 	if err != nil {
@@ -31,7 +33,7 @@ func ServeFrontend(r *gin.Engine, frontendFS embed.FS) {
 			c.Data(503, "text/html; charset=utf-8", []byte(getErrorPage()))
 			return
 		}
-		c.Data(200, "text/html; charset=utf-8", indexContent)
+		c.Data(200, "text/html; charset=utf-8", injectRuntimeConfig(indexContent, envCfg))
 	})
 
 	// NoRoute 处理器 - 智能SPA支持
@@ -68,8 +70,23 @@ func ServeFrontend(r *gin.Engine, frontendFS embed.FS) {
 			c.Data(503, "text/html; charset=utf-8", []byte(getErrorPage()))
 			return
 		}
-		c.Data(200, "text/html; charset=utf-8", indexContent)
+		c.Data(200, "text/html; charset=utf-8", injectRuntimeConfig(indexContent, envCfg))
 	})
+}
+
+func injectRuntimeConfig(indexContent []byte, envCfg *config.EnvConfig) []byte {
+	runtimeScript := fmt.Sprintf(
+		`<script>window.__CCX_RUNTIME_CONFIG__={uiLanguage:%q};</script>`,
+		envCfg.UILanguage,
+	)
+
+	html := string(indexContent)
+	if strings.Contains(html, "</head>") {
+		html = strings.Replace(html, "</head>", runtimeScript+"\n</head>", 1)
+		return []byte(html)
+	}
+
+	return append([]byte(runtimeScript), indexContent...)
 }
 
 // isAPIPath 检查路径是否为 API 端点

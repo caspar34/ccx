@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+import { resolveInitialLocale } from '@/i18n/core'
+import type { SupportedLocale } from '@/i18n'
+
 /**
  * 用户偏好设置 Store
  *
@@ -21,6 +24,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   // 移除计费头开关
   const stripBillingHeader = ref(true)
+
+  // UI 语言
+  const uiLanguage = ref<SupportedLocale>('en')
 
   // 全局统计面板展开状态
   const showGlobalStats = ref(false)
@@ -66,6 +72,20 @@ export const usePreferencesStore = defineStore('preferences', () => {
   }
 
   /**
+   * 设置 UI 语言
+   */
+  function setUILanguage(language: SupportedLocale) {
+    uiLanguage.value = language
+  }
+
+  /**
+   * 初始化 UI 语言，优先使用已持久化值
+   */
+  function initializeUILanguage(runtimeLanguage?: string) {
+    uiLanguage.value = resolveInitialLocale(uiLanguage.value, runtimeLanguage)
+  }
+
+  /**
    * 切换移除计费头
    */
   function toggleStripBillingHeader() {
@@ -84,6 +104,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
     darkModePreference,
     fuzzyModeEnabled,
     stripBillingHeader,
+    uiLanguage,
     showGlobalStats,
 
     // 方法
@@ -93,6 +114,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
     toggleFuzzyMode,
     setStripBillingHeader,
     toggleStripBillingHeader,
+    setUILanguage,
+    initializeUILanguage,
     toggleGlobalStats,
   }
 }, {

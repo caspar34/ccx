@@ -17,12 +17,12 @@
     <v-avatar size="120" color="primary" class="mb-6">
       <v-icon size="60" color="white">mdi-rocket-launch</v-icon>
     </v-avatar>
-    <div class="text-h4 mb-4 font-weight-bold">暂无渠道配置</div>
+    <div class="text-h4 mb-4 font-weight-bold">{{ t('channels.empty.title') }}</div>
     <div class="text-subtitle-1 text-medium-emphasis mb-8">
-      还没有配置任何API渠道，请添加第一个渠道来开始使用代理服务
+      {{ t('channels.empty.description') }}
     </div>
     <v-btn color="primary" size="x-large" prepend-icon="mdi-plus" variant="elevated" @click="emitAddChannel">
-      添加第一个渠道
+      {{ t('channels.empty.button') }}
     </v-btn>
   </v-card>
 </template>
@@ -32,6 +32,7 @@ import { computed } from 'vue'
 import { useChannelStore } from '@/stores/channel'
 import { useDialogStore } from '@/stores/dialog'
 import ChannelOrchestration from '@/components/ChannelOrchestration.vue'
+import { useI18n } from '@/i18n'
 
 // 接收路由参数
 const props = defineProps<{ type: string }>()
@@ -43,6 +44,7 @@ const channelType = computed(() =>
 
 const channelStore = useChannelStore()
 const dialogStore = useDialogStore()
+const { t } = useI18n()
 
 const emitAddChannel = () => {
   // 打开添加渠道对话框

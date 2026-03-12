@@ -9,8 +9,8 @@
     >
       <v-card class="pa-6 text-center" max-width="400" rounded="lg">
         <v-progress-circular indeterminate :size="64" :width="6" color="primary" class="mb-4" />
-        <div class="text-h6 mb-2">正在验证访问权限</div>
-        <div class="text-body-2 text-medium-emphasis">使用保存的访问密钥进行身份验证...</div>
+        <div class="text-h6 mb-2">{{ t('app.auth.verifyingTitle') }}</div>
+        <div class="text-body-2 text-medium-emphasis">{{ t('app.auth.verifyingBody') }}</div>
       </v-card>
     </v-overlay>
 
@@ -27,18 +27,18 @@
           <v-form @submit.prevent="handleAuthSubmit">
             <v-text-field
               v-model="authStore.authKeyInput"
-              label="管理访问密钥"
+              :label="t('app.auth.inputLabel')"
               type="password"
               variant="outlined"
               prepend-inner-icon="mdi-key"
-              :rules="[v => !!v || '请输入管理访问密钥']"
+              :rules="[v => !!v || t('app.auth.inputRequired')]"
               required
               autofocus
               @keyup.enter="handleAuthSubmit"
             />
 
             <v-btn type="submit" color="primary" block size="large" class="mt-4" :loading="authStore.authLoading">
-              访问管理界面
+              {{ t('app.auth.submit') }}
             </v-btn>
           </v-form>
 
@@ -46,13 +46,13 @@
 
           <v-alert type="info" variant="tonal" density="compact" class="mb-0" :icon="false">
             <div class="text-body-2">
-              <p class="mb-2"><strong>🔒 安全提示：</strong></p>
+              <p class="mb-2"><strong>🔒 {{ t('app.auth.securityTitle') }}</strong></p>
               <ul class="ml-4 mb-0">
-                <li>管理界面使用 <code>ADMIN_ACCESS_KEY</code> 认证；未设置时回退到 <code>PROXY_ACCESS_KEY</code></li>
-                <li>密钥将安全保存在本地，下次访问将自动验证登录</li>
-                <li>请勿与他人分享您的访问密钥</li>
-                <li>如果怀疑密钥泄露，请立即更改服务器配置</li>
-                <li>连续 {{ MAX_AUTH_ATTEMPTS }} 次认证失败将锁定 5 分钟</li>
+                <li>{{ t('app.auth.securityItem1') }}</li>
+                <li>{{ t('app.auth.securityItem2') }}</li>
+                <li>{{ t('app.auth.securityItem3') }}</li>
+                <li>{{ t('app.auth.securityItem4') }}</li>
+                <li>{{ t('app.auth.securityItem5', { attempts: MAX_AUTH_ATTEMPTS }) }}</li>
               </ul>
             </div>
           </v-alert>
@@ -79,12 +79,12 @@
               class="mobile-tab-selector text-body-2 font-weight-bold"
               append-icon="mdi-chevron-down"
             >
-              {{ apiTabOptions.find(t => t.value === channelStore.activeTab)?.label }}
+              {{ translatedApiTabOptions.find(tab => tab.value === channelStore.activeTab)?.label }}
             </v-btn>
           </template>
           <v-list density="compact" nav>
             <v-list-item
-              v-for="tab in apiTabOptions"
+              v-for="tab in translatedApiTabOptions"
               :key="tab.value"
               :active="channelStore.activeTab === tab.value"
               :to="tab.route"
@@ -97,19 +97,19 @@
         <!-- 桌面端：平铺链接 -->
         <div v-else class="text-h6 font-weight-bold d-flex align-center">
           <router-link to="/channels/messages" class="api-type-text" :class="{ active: channelStore.activeTab === 'messages' }">
-            Claude
+            {{ t('app.tabs.messages') }}
           </router-link>
           <span class="api-type-text separator">/</span>
           <router-link to="/channels/chat" class="api-type-text" :class="{ active: channelStore.activeTab === 'chat' }">
-            OpenAI Chat
+            {{ t('app.tabs.chat') }}
           </router-link>
           <span class="api-type-text separator">/</span>
           <router-link to="/channels/responses" class="api-type-text" :class="{ active: channelStore.activeTab === 'responses' }">
-            Codex
+            {{ t('app.tabs.responses') }}
           </router-link>
           <span class="api-type-text separator">/</span>
           <router-link to="/channels/gemini" class="api-type-text" :class="{ active: channelStore.activeTab === 'gemini' }">
-            Gemini
+            {{ t('app.tabs.gemini') }}
           </router-link>
           <span class="brand-text d-none d-md-inline">API Proxy - CCX</span>
         </div>
@@ -167,7 +167,7 @@
         variant="text"
         size="small"
         class="header-btn"
-        title="注销"
+        :title="t('app.header.logout')"
         @click="handleLogout"
       >
         <v-icon size="20">mdi-logout</v-icon>
@@ -186,9 +186,7 @@
           >
             <div class="d-flex align-center">
               <v-icon size="20" class="mr-2">mdi-chart-areaspline</v-icon>
-              <span class="text-subtitle-1 font-weight-bold">
-                {{ channelStore.activeTab === 'messages' ? 'Claude Messages' : channelStore.activeTab === 'chat' ? 'OpenAI Chat' : (channelStore.activeTab === 'responses' ? 'Codex Responses' : 'Gemini') }} 流量统计
-              </span>
+              <span class="text-subtitle-1 font-weight-bold">{{ activeTrafficTitle }}</span>
             </div>
             <v-btn icon size="small" variant="text">
               <v-icon>{{ preferencesStore.showGlobalStats ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
@@ -211,8 +209,8 @@
               </div>
               <div class="stat-card-content">
                 <div class="stat-card-value">{{ channelStore.currentChannelsData.channels?.length || 0 }}</div>
-                <div class="stat-card-label">总渠道数</div>
-                <div class="stat-card-desc">已配置的API渠道</div>
+                <div class="stat-card-label">{{ t('app.stats.totalChannels') }}</div>
+                <div class="stat-card-desc">{{ t('app.stats.totalChannelsDesc') }}</div>
               </div>
               <div class="stat-card-glow"></div>
             </div>
@@ -227,8 +225,8 @@
                 <div class="stat-card-value">
                   {{ channelStore.activeChannelCount }}<span class="stat-card-total">/{{ channelStore.failoverChannelCount }}</span>
                 </div>
-                <div class="stat-card-label">活跃渠道</div>
-                <div class="stat-card-desc">参与故障转移调度</div>
+                <div class="stat-card-label">{{ t('app.stats.activeChannels') }}</div>
+                <div class="stat-card-desc">{{ t('app.stats.activeChannelsDesc') }}</div>
               </div>
               <div class="stat-card-glow"></div>
             </div>
@@ -240,9 +238,9 @@
                 <v-icon size="28">{{ systemStore.systemStatus === 'running' ? 'mdi-heart-pulse' : 'mdi-alert-circle' }}</v-icon>
               </div>
               <div class="stat-card-content">
-                <div class="stat-card-value">{{ systemStore.systemStatusText }}</div>
-                <div class="stat-card-label">系统状态</div>
-                <div class="stat-card-desc">{{ systemStore.systemStatusDesc }}</div>
+                <div class="stat-card-value">{{ systemStatusText }}</div>
+                <div class="stat-card-label">{{ t('app.stats.systemStatus') }}</div>
+                <div class="stat-card-desc">{{ systemStatusDesc }}</div>
               </div>
               <div class="stat-card-glow"></div>
             </div>
@@ -259,7 +257,7 @@
               class="action-btn action-btn-primary"
               @click="openAddChannelModal"
             >
-              添加渠道
+              {{ t('app.actions.addChannel') }}
             </v-btn>
 
             <v-btn
@@ -271,11 +269,11 @@
               class="action-btn"
               @click="pingAllChannels"
             >
-              测试延迟
+              {{ t('app.actions.ping') }}
             </v-btn>
 
             <v-btn size="large" prepend-icon="mdi-refresh" variant="text" class="action-btn" @click="refreshChannels">
-              刷新
+              {{ t('app.actions.refresh') }}
             </v-btn>
           </div>
 
@@ -299,7 +297,7 @@
                   CCH
                 </v-btn>
               </template>
-              <span>{{ systemStore.stripBillingHeaderLoadError ? '加载失败，请刷新页面' : (preferencesStore.stripBillingHeader ? '已启用：自动移除 system 中的 cch= 计费参数' : '已关闭：保留完整的计费头信息') }}</span>
+              <span>{{ systemStore.stripBillingHeaderLoadError ? t('tooltip.loadFailedRefresh') : (preferencesStore.stripBillingHeader ? t('tooltip.billingEnabled') : t('tooltip.billingDisabled')) }}</span>
             </v-tooltip>
 
             <!-- Fuzzy 模式切换按钮 -->
@@ -321,7 +319,7 @@
                   Fuzzy
                 </v-btn>
               </template>
-              <span>{{ systemStore.fuzzyModeLoadError ? '加载失败，请刷新页面' : (preferencesStore.fuzzyModeEnabled ? 'Fuzzy 模式已启用：模糊处理错误，自动尝试所有渠道' : 'Fuzzy 模式已关闭：精确处理错误，透传上游响应') }}</span>
+              <span>{{ systemStore.fuzzyModeLoadError ? t('tooltip.loadFailedRefresh') : (preferencesStore.fuzzyModeEnabled ? t('tooltip.fuzzyEnabled') : t('tooltip.fuzzyDisabled')) }}</span>
             </v-tooltip>
           </div>
         </div>
@@ -362,23 +360,23 @@
       <v-card rounded="lg">
         <v-card-title class="d-flex align-center">
           <v-icon class="mr-3">mdi-key-plus</v-icon>
-          添加API密钥
+          {{ t('app.dialog.addApiKeyTitle') }}
         </v-card-title>
         <v-card-text>
           <v-text-field
             v-model="dialogStore.newApiKey"
-            label="API密钥"
+            :label="t('app.dialog.apiKeyLabel')"
             type="password"
             variant="outlined"
             density="comfortable"
-            placeholder="输入API密钥"
+            :placeholder="t('app.dialog.apiKeyPlaceholder')"
             @keyup.enter="addApiKey"
           />
         </v-card-text>
         <v-card-actions>
           <v-spacer/>
-          <v-btn variant="text" @click="dialogStore.closeAddKeyModal()">取消</v-btn>
-          <v-btn :disabled="!dialogStore.newApiKey.trim()" color="primary" variant="elevated" @click="addApiKey">添加</v-btn>
+          <v-btn variant="text" @click="dialogStore.closeAddKeyModal()">{{ t('app.actions.cancel') }}</v-btn>
+          <v-btn :disabled="!dialogStore.newApiKey.trim()" color="primary" variant="elevated" @click="addApiKey">{{ t('app.actions.add') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -411,6 +409,7 @@ import { useChannelStore } from './stores/channel'
 import { usePreferencesStore } from './stores/preferences'
 import { useDialogStore } from './stores/dialog'
 import { useSystemStore } from './stores/system'
+import { useI18n } from './i18n'
 import AddChannelModal from './components/AddChannelModal.vue'
 import CapabilityTestDialog from './components/CapabilityTestDialog.vue'
 // 异步加载图表组件，减少首屏 JS 体积
@@ -437,14 +436,54 @@ const dialogStore = useDialogStore()
 
 // 系统状态 Store
 const systemStore = useSystemStore()
+const { t } = useI18n()
 
 // API 类型 Tab 选项（移动端下拉菜单使用）
 const apiTabOptions = [
-  { value: 'messages', label: 'Claude', route: '/channels/messages' },
-  { value: 'chat', label: 'OpenAI Chat', route: '/channels/chat' },
-  { value: 'responses', label: 'Codex', route: '/channels/responses' },
-  { value: 'gemini', label: 'Gemini', route: '/channels/gemini' },
+  { value: 'messages', labelKey: 'app.tabs.messages', route: '/channels/messages' },
+  { value: 'chat', labelKey: 'app.tabs.chat', route: '/channels/chat' },
+  { value: 'responses', labelKey: 'app.tabs.responses', route: '/channels/responses' },
+  { value: 'gemini', labelKey: 'app.tabs.gemini', route: '/channels/gemini' },
 ] as const
+
+const translatedApiTabOptions = computed(() => {
+  return apiTabOptions.map(tab => ({
+    ...tab,
+    label: t(tab.labelKey),
+  }))
+})
+
+const currentTabLabel = computed(() => {
+  return translatedApiTabOptions.value.find(tab => tab.value === channelStore.activeTab)?.label || channelStore.activeTab
+})
+
+const activeTrafficTitle = computed(() => t('app.stats.trafficTitle', { tab: currentTabLabel.value }))
+
+const systemStatusText = computed(() => {
+  switch (systemStore.systemStatus) {
+    case 'running':
+      return t('system.running')
+    case 'error':
+      return t('system.error')
+    case 'connecting':
+      return t('system.connecting')
+    default:
+      return t('system.unknown')
+  }
+})
+
+const systemStatusDesc = computed(() => {
+  switch (systemStore.systemStatus) {
+    case 'running':
+      return t('system.runningDesc')
+    case 'error':
+      return t('system.errorDesc')
+    case 'connecting':
+      return t('system.connectingDesc')
+    default:
+      return ''
+  }
+})
 
 // 对话框状态已迁移到 DialogStore
 
@@ -537,7 +576,7 @@ const editChannel = (channel: Channel) => {
 }
 
 const deleteChannel = async (channelId: number) => {
-  if (!confirm('确定要删除这个渠道吗？')) return
+  if (!confirm(t('toast.confirmDeleteChannel'))) return
 
   try {
     const result = await channelStore.deleteChannel(channelId)
@@ -568,16 +607,16 @@ const addApiKey = async () => {
     } else {
       await api.addApiKey(dialogStore.selectedChannelForKey, dialogStore.newApiKey.trim())
     }
-    showToast('API密钥添加成功', 'success')
+    showToast(t('toast.apiKeyAdded'), 'success')
     dialogStore.closeAddKeyModal()
     await refreshChannels()
   } catch (error) {
-    showToast(`添加API密钥失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+    showToast(t('toast.apiKeyAddFailed', { message: error instanceof Error ? error.message : t('system.unknown') }), 'error')
   }
 }
 
 const _removeApiKey = async (channelId: number, apiKey: string) => {
-  if (!confirm('确定要删除这个API密钥吗？')) return
+  if (!confirm(t('toast.confirmDeleteApiKey'))) return
 
   try {
     if (channelStore.activeTab === 'chat') {
@@ -589,10 +628,10 @@ const _removeApiKey = async (channelId: number, apiKey: string) => {
     } else {
       await api.removeApiKey(channelId, apiKey)
     }
-    showToast('API密钥删除成功', 'success')
+    showToast(t('toast.apiKeyDeleted'), 'success')
     await refreshChannels()
   } catch (error) {
-    showToast(`删除API密钥失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+    showToast(t('toast.apiKeyDeleteFailed', { message: error instanceof Error ? error.message : t('system.unknown') }), 'error')
   }
 }
 
@@ -601,7 +640,7 @@ const pingChannel = async (channelId: number) => {
     await channelStore.pingChannel(channelId)
     // 不再使用 Toast，延迟结果直接显示在渠道列表中
   } catch (error) {
-    showToast(`延迟测试失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+    showToast(t('toast.latencyFailed', { message: error instanceof Error ? error.message : t('system.unknown') }), 'error')
   }
 }
 
@@ -616,7 +655,7 @@ const capabilityTestDialogRef = ref<InstanceType<typeof CapabilityTestDialog> | 
 const testChannelCapability = async (channelId: number) => {
   // 获取渠道信息
   const channel = channelStore.currentChannelsData.channels?.find(ch => ch.index === channelId)
-  capabilityTestChannelName.value = channel?.name || `渠道 #${channelId}`
+  capabilityTestChannelName.value = channel?.name || t('capability.channelFallback', { id: channelId })
   capabilityTestChannelId.value = channelId
 
   // 打开对话框并设置加载状态
@@ -628,8 +667,8 @@ const testChannelCapability = async (channelId: number) => {
     capabilityTestResult.value = result
     capabilityTestDialogRef.value?.startTest(result)
   } catch (error) {
-    const message = error instanceof Error ? error.message : '未知错误'
-    capabilityTestDialogRef.value?.setError(`能力测试失败: ${message}`)
+    const message = error instanceof Error ? error.message : t('system.unknown')
+    capabilityTestDialogRef.value?.setError(t('toast.capabilityFailed', { message }))
   }
 }
 
@@ -637,12 +676,12 @@ const testChannelCapability = async (channelId: number) => {
 const handleCopyToTab = async (targetProtocol: string) => {
   const sourceChannel = channelStore.currentChannelsData.channels?.find(ch => ch.index === capabilityTestChannelId.value)
   if (!sourceChannel) {
-    showToast('找不到源渠道信息', 'error')
+    showToast(t('toast.sourceChannelMissing'), 'error')
     return
   }
 
   // 构造渠道配置（仅复制核心连接信息）
-  const channelConfig: Partial<Channel> = {
+  const channelConfig: Omit<Channel, 'index' | 'latency' | 'status'> = {
     name: sourceChannel.name,
     serviceType: sourceChannel.serviceType,
     baseUrl: sourceChannel.baseUrl,
@@ -651,6 +690,18 @@ const handleCopyToTab = async (targetProtocol: string) => {
     description: sourceChannel.description,
     website: sourceChannel.website,
     proxyUrl: sourceChannel.proxyUrl,
+    insecureSkipVerify: sourceChannel.insecureSkipVerify,
+    modelMapping: sourceChannel.modelMapping,
+    reasoningMapping: sourceChannel.reasoningMapping,
+    textVerbosity: sourceChannel.textVerbosity,
+    fastMode: sourceChannel.fastMode,
+    customHeaders: sourceChannel.customHeaders,
+    pinned: sourceChannel.pinned,
+    priority: sourceChannel.priority,
+    lowQuality: sourceChannel.lowQuality,
+    injectDummyThoughtSignature: sourceChannel.injectDummyThoughtSignature,
+    stripThoughtSignature: sourceChannel.stripThoughtSignature,
+    supportedModels: sourceChannel.supportedModels,
   }
 
   try {
@@ -669,14 +720,14 @@ const handleCopyToTab = async (targetProtocol: string) => {
         await api.addResponsesChannel(channelConfig)
         break
       default:
-        showToast(`不支持的目标协议: ${targetProtocol}`, 'error')
+        showToast(t('toast.unsupportedProtocol', { protocol: targetProtocol }), 'error')
         return
     }
 
-    showToast(`渠道已复制到 ${targetProtocol} Tab`, 'success')
+    showToast(t('toast.channelCopied', { protocol: targetProtocol }), 'success')
     await refreshChannels()
   } catch (error) {
-    showToast(`复制渠道失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+    showToast(t('toast.copyFailed', { message: error instanceof Error ? error.message : t('system.unknown') }), 'error')
   }
 }
 
@@ -685,7 +736,7 @@ const pingAllChannels = async () => {
     await channelStore.pingAllChannels()
     // 不再使用 Toast，延迟结果直接显示在渠道列表中
   } catch (error) {
-    showToast(`批量延迟测试失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+    showToast(t('toast.batchLatencyFailed', { message: error instanceof Error ? error.message : t('system.unknown') }), 'error')
   }
 }
 
@@ -699,22 +750,22 @@ const loadFuzzyModeStatus = async () => {
     console.error('Failed to load fuzzy mode status:', e)
     systemStore.setFuzzyModeLoadError(true)
     // 加载失败时不使用默认值，保持 UI 显示未知状态
-    showToast('加载 Fuzzy 模式状态失败，请刷新页面重试', 'warning')
+    showToast(t('toast.loadFuzzyFailed'), 'warning')
   }
 }
 
 const toggleFuzzyMode = async () => {
   if (systemStore.fuzzyModeLoadError) {
-    showToast('Fuzzy 模式状态未知，请先刷新页面', 'warning')
+    showToast(t('toast.fuzzyUnknown'), 'warning')
     return
   }
   systemStore.setFuzzyModeLoading(true)
   try {
     await api.setFuzzyMode(!preferencesStore.fuzzyModeEnabled)
     preferencesStore.toggleFuzzyMode()
-    showToast(`Fuzzy 模式已${preferencesStore.fuzzyModeEnabled ? '启用' : '关闭'}`, 'success')
+    showToast(t('toast.fuzzyToggled', { state: preferencesStore.fuzzyModeEnabled ? t('common.enabled') : t('common.disabled') }), 'success')
   } catch (e) {
-    showToast(`切换 Fuzzy 模式失败: ${e instanceof Error ? e.message : '未知错误'}`, 'error')
+    showToast(t('toast.fuzzyToggleFailed', { message: e instanceof Error ? e.message : t('system.unknown') }), 'error')
   } finally {
     systemStore.setFuzzyModeLoading(false)
   }
@@ -729,22 +780,22 @@ const loadStripBillingHeaderStatus = async () => {
   } catch (e) {
     console.error('Failed to load strip billing header status:', e)
     systemStore.setStripBillingHeaderLoadError(true)
-    showToast('加载移除计费头状态失败，请刷新页面重试', 'warning')
+    showToast(t('toast.loadBillingFailed'), 'warning')
   }
 }
 
 const toggleStripBillingHeader = async () => {
   if (systemStore.stripBillingHeaderLoadError) {
-    showToast('移除计费头状态未知，请先刷新页面', 'warning')
+    showToast(t('toast.billingUnknown'), 'warning')
     return
   }
   systemStore.setStripBillingHeaderLoading(true)
   try {
     await api.setStripBillingHeader(!preferencesStore.stripBillingHeader)
     preferencesStore.toggleStripBillingHeader()
-    showToast(`移除计费头已${preferencesStore.stripBillingHeader ? '启用' : '关闭'}`, 'success')
+    showToast(t('toast.billingToggled', { state: preferencesStore.stripBillingHeader ? t('common.enabled') : t('common.disabled') }), 'success')
   } catch (e) {
-    showToast(`切换移除计费头失败: ${e instanceof Error ? e.message : '未知错误'}`, 'error')
+    showToast(t('toast.billingToggleFailed', { message: e instanceof Error ? e.message : t('system.unknown') }), 'error')
   } finally {
     systemStore.setStripBillingHeaderLoading(false)
   }
@@ -793,7 +844,7 @@ const autoAuthenticate = async () => {
   // 检查 AuthStore 中是否有保存的密钥
   if (!authStore.apiKey) {
     // 没有保存的密钥，显示登录对话框
-    authStore.setAuthError('请输入访问密钥以继续')
+    authStore.setAuthError(t('toast.enterAccessKeyContinue'))
     authStore.setAutoAuthenticating(false)
     authStore.setInitialized(true)
     return false
@@ -812,12 +863,12 @@ const autoAuthenticate = async () => {
     if (error instanceof ApiError && error.status === 401) {
       console.warn('自动认证失败: 认证失败(401)')
       authStore.clearAuth()
-      authStore.setAuthError('保存的访问密钥已失效，请重新输入')
+      authStore.setAuthError(t('toast.savedKeyInvalid'))
       return false
     }
 
     console.warn('自动认证暂时失败:', error)
-    showToast(`无法验证访问密钥: ${error instanceof Error ? error.message : '未知错误'}`, 'warning')
+    showToast(t('toast.cannotVerifyAccessKey', { message: error instanceof Error ? error.message : t('system.unknown') }), 'warning')
     // 非 401：保留密钥，继续尝试连接后端（后续刷新会更新系统状态）
     return true
   } finally {
@@ -835,14 +886,14 @@ const setAuthKey = (key: string) => {
 // 处理认证提交
 const handleAuthSubmit = async () => {
   if (!authStore.authKeyInput.trim()) {
-    authStore.setAuthError('请输入访问密钥')
+    authStore.setAuthError(t('toast.enterAccessKey'))
     return
   }
 
   // 检查是否被锁定
   if (authStore.isAuthLocked) {
     const remainingSeconds = Math.ceil((authStore.authLockoutTime! - Date.now()) / 1000)
-    authStore.setAuthError(`认证尝试次数过多，请在 ${remainingSeconds} 秒后重试`)
+    authStore.setAuthError(t('toast.tooManyAttemptsSeconds', { seconds: remainingSeconds }))
     return
   }
 
@@ -880,16 +931,16 @@ const handleAuthSubmit = async () => {
       // 如果尝试次数过多，锁定5分钟
       if (authStore.authAttempts >= MAX_AUTH_ATTEMPTS) {
         authStore.setAuthLockout(new Date(Date.now() + 5 * 60 * 1000))
-        authStore.setAuthError('认证尝试次数过多，请在5分钟后重试')
+        authStore.setAuthError(t('toast.tooManyAttempts'))
       } else {
-        authStore.setAuthError(`访问密钥验证失败 (剩余尝试次数: ${MAX_AUTH_ATTEMPTS - authStore.authAttempts})`)
+        authStore.setAuthError(t('toast.accessKeyInvalidRemaining', { remaining: MAX_AUTH_ATTEMPTS - authStore.authAttempts }))
       }
 
       authStore.clearAuth()
       return
     }
 
-    showToast(`无法验证访问密钥: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+    showToast(t('toast.cannotVerifyAccessKey', { message: error instanceof Error ? error.message : t('system.unknown') }), 'error')
   } finally {
     authStore.setAuthLoading(false)
   }
@@ -899,16 +950,16 @@ const handleAuthSubmit = async () => {
 const handleLogout = () => {
   authStore.clearAuth()
   channelStore.clearChannels()
-  authStore.setAuthError('请输入访问密钥以继续')
-  showToast('已安全注销', 'info')
+  authStore.setAuthError(t('toast.enterAccessKeyContinue'))
+  showToast(t('toast.loggedOut'), 'info')
 }
 
 // 处理认证失败
 const handleAuthError = (error: any) => {
   if (error.message && error.message.includes('认证失败')) {
-    authStore.setAuthError('访问密钥无效或已过期，请重新输入')
+    authStore.setAuthError(t('toast.authInvalid'))
   } else {
-    showToast(`操作失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error')
+    showToast(t('toast.operationFailed', { message: error instanceof Error ? error.message : t('system.unknown') }), 'error')
   }
 }
 

@@ -2,10 +2,10 @@
   <v-dialog :model-value="modelValue" max-width="800" @update:model-value="$emit('update:modelValue', $event)">
     <v-card>
       <v-card-title class="d-flex align-center justify-space-between">
-        <span>渠道日志 - {{ channelName }}</span>
+        <span>{{ t('channelLogs.title', { channel: channelName }) }}</span>
         <div class="d-flex align-center ga-2">
           <v-btn size="x-small" :variant="autoRefresh ? 'flat' : 'outlined'" :color="autoRefresh ? 'primary' : ''" @click="autoRefresh = !autoRefresh">
-            {{ autoRefresh ? '自动刷新中' : '自动刷新' }}
+            {{ autoRefresh ? t('channelLogs.autoRefreshing') : t('channelLogs.autoRefresh') }}
           </v-btn>
           <v-btn icon size="small" variant="text" @click="$emit('update:modelValue', false)">
             <v-icon>mdi-close</v-icon>
@@ -22,7 +22,7 @@
         <!-- Empty -->
         <div v-else-if="!logs.length" class="text-center py-8 text-medium-emphasis">
           <v-icon size="40">mdi-format-list-bulleted</v-icon>
-          <div class="text-caption mt-2">暂无日志记录</div>
+          <div class="text-caption mt-2">{{ t('channelLogs.empty') }}</div>
         </div>
 
         <!-- Log list -->
@@ -43,7 +43,7 @@
                 <span class="font-weight-medium">{{ log.model }}</span>
                 <span class="text-caption text-medium-emphasis">{{ log.durationMs }}ms</span>
                 <span class="text-caption text-medium-emphasis">{{ log.keyMask }}</span>
-                <v-chip v-if="log.isRetry" size="x-small" color="warning" variant="tonal">重试</v-chip>
+                <v-chip v-if="log.isRetry" size="x-small" color="warning" variant="tonal">{{ t('channelLogs.retry') }}</v-chip>
               </v-list-item-title>
             </v-list-item>
             <!-- 展开的错误详情 -->
@@ -63,6 +63,7 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from 'vue'
 import { api, type ChannelLogEntry } from '../services/api'
+import { useI18n } from '../i18n'
 
 const props = defineProps<{
   modelValue: boolean
@@ -74,6 +75,7 @@ const props = defineProps<{
 defineEmits<{
   (_e: 'update:modelValue', _v: boolean): void
 }>()
+const { t } = useI18n()
 
 const logs = ref<ChannelLogEntry[]>([])
 const isLoading = ref(false)

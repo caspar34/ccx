@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { usePreferencesStore } from '@/stores/preferences'
 import { api, type Channel, type ChannelsResponse, type ChannelMetrics, type ChannelDashboardResponse } from '@/services/api'
+import { normalizeLocale, translate } from '@/i18n/core'
 
 /**
  * 渠道数据管理 Store
@@ -13,6 +15,10 @@ import { api, type Channel, type ChannelsResponse, type ChannelMetrics, type Cha
  * - 管理自动刷新定时器
  */
 export const useChannelStore = defineStore('channel', () => {
+  const preferencesStore = usePreferencesStore()
+  const t = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => {
+    return translate(normalizeLocale(preferencesStore.uiLanguage), key, params)
+  }
   // ===== 状态 =====
 
   // 当前选中的 API 类型
@@ -263,7 +269,7 @@ export const useChannelStore = defineStore('channel', () => {
       } else {
         await api.updateChannel(editingChannelIndex, channel)
       }
-      return { success: true, message: '渠道更新成功' }
+      return { success: true, message: t('store.channel.updated') }
     } else {
       // 添加新渠道
       if (isChat) {
@@ -318,8 +324,8 @@ export const useChannelStore = defineStore('channel', () => {
 
             return {
               success: true,
-              message: '渠道添加成功',
-              quickAddMessage: `渠道 ${channel.name} 已设为最高优先级，5分钟内优先使用`
+              message: t('store.channel.added'),
+              quickAddMessage: t('store.channel.quickAddPrioritized', { name: channel.name })
             }
           } catch (err) {
             console.warn('设置快速添加优先级失败:', err)
@@ -328,7 +334,7 @@ export const useChannelStore = defineStore('channel', () => {
         }
       }
 
-      return { success: true, message: '渠道添加成功' }
+      return { success: true, message: t('store.channel.added') }
     }
   }
 
@@ -346,7 +352,7 @@ export const useChannelStore = defineStore('channel', () => {
       await api.deleteChannel(channelId)
     }
     await refreshChannels()
-    return { success: true, message: '渠道删除成功' }
+    return { success: true, message: t('store.channel.deleted') }
   }
 
   /**
@@ -378,7 +384,7 @@ export const useChannelStore = defineStore('channel', () => {
    * 批量测试所有渠道延迟
    */
   async function pingAllChannels() {
-    if (isPingingAll.value) return { success: false, message: '正在测试中' }
+    if (isPingingAll.value) return { success: false, message: t('store.channel.pinging') }
 
     isPingingAll.value = true
     try {
@@ -421,7 +427,7 @@ export const useChannelStore = defineStore('channel', () => {
       try {
         await refreshChannels()
       } catch (error) {
-        console.warn('自动刷新失败:', error)
+        console.warn(t('store.channel.autoRefreshFailed'), error)
       } finally {
         if (autoRefreshRunning) {
           autoRefreshTimer = setTimeout(() => {

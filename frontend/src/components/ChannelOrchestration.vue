@@ -4,18 +4,18 @@
     <v-card-title class="d-flex align-center justify-space-between py-3 px-0">
       <div class="d-flex align-center" style="flex-shrink: 1; min-width: 0;">
         <v-icon class="mr-2" color="primary">mdi-swap-vertical-bold</v-icon>
-        <span class="text-h6" style="white-space: nowrap;">渠道编排</span>
+        <span class="text-h6" style="white-space: nowrap;">{{ t('orchestration.title') }}</span>
         <v-chip v-if="isMultiChannelMode" size="small" color="success" variant="tonal" class="ml-3">
-          多渠道模式
+          {{ t('orchestration.multiChannel') }}
         </v-chip>
-        <v-chip v-else size="small" color="warning" variant="tonal" class="ml-3"> 单渠道模式 </v-chip>
+        <v-chip v-else size="small" color="warning" variant="tonal" class="ml-3"> {{ t('orchestration.singleChannel') }} </v-chip>
       </div>
       <div class="d-flex align-center ga-2">
         <v-text-field
           v-model="searchQuery"
           density="compact"
           variant="outlined"
-          placeholder="搜索渠道..."
+          :placeholder="t('orchestration.searchPlaceholder')"
           prepend-inner-icon="mdi-magnify"
           clearable
           hide-details
@@ -33,11 +33,11 @@
       <div class="d-flex align-center justify-space-between mb-2">
         <div class="text-subtitle-2 text-medium-emphasis d-flex align-center">
           <v-icon size="small" class="mr-1" color="success">mdi-play-circle</v-icon>
-          故障转移序列
+          {{ t('orchestration.failoverSequence') }}
           <v-chip size="x-small" class="ml-2">{{ activeChannels.length }}</v-chip>
         </div>
         <div class="d-flex align-center ga-2">
-          <span class="text-caption text-medium-emphasis">拖拽调整优先级，自动保存</span>
+          <span class="text-caption text-medium-emphasis">{{ t('orchestration.dragHint') }}</span>
           <v-progress-circular v-if="isSavingOrder" indeterminate size="16" width="2" color="primary" />
         </div>
       </div>
@@ -139,7 +139,7 @@
                 variant="text"
                 color="primary"
                 class="ml-1"
-                title="打开官网"
+                :title="t('orchestration.openWebsite')"
                 @click.stop
               >
                 <v-icon size="14">mdi-open-in-new</v-icon>
@@ -170,7 +170,7 @@
                           {{ get15mStats(element.index)?.successRate?.toFixed(0) }}%
                         </v-chip>
                         <span class="text-caption text-medium-emphasis ml-2 mr-1">
-                          {{ get15mStats(element.index)?.requestCount }} 请求
+                          {{ get15mStats(element.index)?.requestCount }} {{ t('orchestration.requests') }}
                         </span>
                         <v-chip
                           v-if="shouldShowCacheHitRate(get15mStats(element.index))"
@@ -179,46 +179,46 @@
                           variant="tonal"
                           class="ml-1"
                         >
-                          缓存 {{ get15mStats(element.index)?.cacheHitRate?.toFixed(0) }}%
+                          {{ t('orchestration.cache') }} {{ get15mStats(element.index)?.cacheHitRate?.toFixed(0) }}%
                         </v-chip>
                       </template>
                       <span v-else class="text-caption text-medium-emphasis">--</span>
                     </div>
                   </template>
                   <div class="metrics-tooltip">
-                    <div class="text-caption font-weight-bold mb-1">请求统计</div>
+                    <div class="text-caption font-weight-bold mb-1">{{ t('orchestration.requestStats') }}</div>
                     <div class="metrics-tooltip-row">
-                      <span>15分钟:</span>
+                      <span>{{ t('orchestration.minutes15') }}:</span>
                       <span>{{ formatStats(get15mStats(element.index)) }}</span>
                     </div>
                     <div class="metrics-tooltip-row">
-                      <span>1小时:</span>
+                      <span>{{ t('orchestration.hour1') }}:</span>
                       <span>{{ formatStats(get1hStats(element.index)) }}</span>
                     </div>
                     <div class="metrics-tooltip-row">
-                      <span>6小时:</span>
+                      <span>{{ t('orchestration.hours6') }}:</span>
                       <span>{{ formatStats(get6hStats(element.index)) }}</span>
                     </div>
                     <div class="metrics-tooltip-row">
-                      <span>24小时:</span>
+                      <span>{{ t('orchestration.hours24') }}:</span>
                       <span>{{ formatStats(get24hStats(element.index)) }}</span>
                     </div>
 
-                    <div class="text-caption font-weight-bold mt-2 mb-1">缓存统计 (Token)</div>
+                    <div class="text-caption font-weight-bold mt-2 mb-1">{{ t('orchestration.cacheStats') }}</div>
                     <div class="metrics-tooltip-row">
-                      <span>15分钟:</span>
+                      <span>{{ t('orchestration.minutes15') }}:</span>
                       <span>{{ formatCacheStats(get15mStats(element.index)) }}</span>
                     </div>
                     <div class="metrics-tooltip-row">
-                      <span>1小时:</span>
+                      <span>{{ t('orchestration.hour1') }}:</span>
                       <span>{{ formatCacheStats(get1hStats(element.index)) }}</span>
                     </div>
                     <div class="metrics-tooltip-row">
-                      <span>6小时:</span>
+                      <span>{{ t('orchestration.hours6') }}:</span>
                       <span>{{ formatCacheStats(get6hStats(element.index)) }}</span>
                     </div>
                     <div class="metrics-tooltip-row">
-                      <span>24小时:</span>
+                      <span>{{ t('orchestration.hours24') }}:</span>
                       <span>{{ formatCacheStats(get24hStats(element.index)) }}</span>
                     </div>
                   </div>
@@ -270,7 +270,7 @@
                 size="x-small"
                 variant="text"
                 color="warning"
-                title="恢复"
+                :title="t('orchestration.resume')"
                 @click="resumeChannel(element.index)"
               >
                 <v-icon size="small">mdi-refresh</v-icon>
@@ -280,7 +280,7 @@
                 icon
                 size="x-small"
                 variant="text"
-                title="查看日志"
+                :title="t('orchestration.logs')"
                 @click="openLogsDialog(element)"
               >
                 <v-icon size="small">mdi-history</v-icon>
@@ -305,56 +305,56 @@
                     <template #prepend>
                       <v-icon size="small">mdi-pencil</v-icon>
                     </template>
-                    <v-list-item-title>编辑</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.edit') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item @click="$emit('ping', element.index)">
                     <template #prepend>
                       <v-icon size="small">mdi-speedometer</v-icon>
                     </template>
-                    <v-list-item-title>测试延迟</v-list-item-title>
+                    <v-list-item-title>{{ t('app.actions.ping') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item @click="$emit('testCapability', element.index)">
                     <template #prepend>
                       <v-icon size="small" color="success">mdi-test-tube</v-icon>
                     </template>
-                    <v-list-item-title>能力测试</v-list-item-title>
+                    <v-list-item-title>{{ t('addChannel.testCapability') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item @click="openLogsDialog(element)">
                     <template #prepend>
                       <v-icon size="small">mdi-history</v-icon>
                     </template>
-                    <v-list-item-title>日志</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.logs') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item @click="copyChannelInfo(element)">
                     <template #prepend>
                       <v-icon size="small">mdi-content-copy</v-icon>
                     </template>
-                    <v-list-item-title>复制配置</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.copyConfig') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item @click="setPromotion(element)">
                     <template #prepend>
                       <v-icon size="small" color="info">mdi-rocket-launch</v-icon>
                     </template>
-                    <v-list-item-title>抢优先级 (5分钟)</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.promotion') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item v-if="index > 0" :disabled="isSavingOrder" @click="moveChannelToTop(element.index)">
                     <template #prepend>
                       <v-icon size="small" color="primary">mdi-arrow-collapse-up</v-icon>
                     </template>
-                    <v-list-item-title>置顶</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.moveTop') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item v-if="index < activeChannels.length - 1" :disabled="isSavingOrder" @click="moveChannelToBottom(element.index)">
                     <template #prepend>
                       <v-icon size="small" color="primary">mdi-arrow-collapse-down</v-icon>
                     </template>
-                    <v-list-item-title>置底</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.moveBottom') }}</v-list-item-title>
                   </v-list-item>
                   <v-divider />
                   <v-list-item v-if="element.status === 'suspended'" @click="resumeChannel(element.index)">
                     <template #prepend>
                       <v-icon size="small" color="success">mdi-play-circle</v-icon>
                     </template>
-                    <v-list-item-title>恢复 (重置指标)</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.resumeReset') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item
                     v-if="element.status !== 'suspended'"
@@ -363,22 +363,22 @@
                     <template #prepend>
                       <v-icon size="small" color="warning">mdi-pause-circle</v-icon>
                     </template>
-                    <v-list-item-title>暂停</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.pause') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item @click="setChannelStatus(element.index, 'disabled')">
                     <template #prepend>
                       <v-icon size="small" color="error">mdi-stop-circle</v-icon>
                     </template>
-                    <v-list-item-title>移至备用池</v-list-item-title>
+                    <v-list-item-title>{{ t('orchestration.moveToPool') }}</v-list-item-title>
                   </v-list-item>
                   <v-list-item :disabled="!canDeleteChannel(element)" @click="handleDeleteChannel(element)">
                     <template #prepend>
                       <v-icon size="small" :color="canDeleteChannel(element) ? 'error' : 'grey'">mdi-delete</v-icon>
                     </template>
                     <v-list-item-title>
-                      删除
+                      {{ t('orchestration.delete') }}
                       <span v-if="!canDeleteChannel(element)" class="text-caption text-disabled ml-1">
-                        (至少保留一个)
+                        {{ t('orchestration.keepOne') }}
                       </span>
                     </v-list-item-title>
                   </v-list-item>
@@ -406,8 +406,8 @@
       <!-- 空状态 -->
       <div v-if="activeChannels.length === 0" class="text-center py-6 text-medium-emphasis">
         <v-icon size="48" color="grey-lighten-1">mdi-playlist-remove</v-icon>
-        <div class="mt-2">暂无活跃渠道</div>
-        <div class="text-caption">从下方备用池启用渠道</div>
+        <div class="mt-2">{{ t('orchestration.noActiveChannels') }}</div>
+        <div class="text-caption">{{ t('orchestration.enableFromPool') }}</div>
       </div>
     </div>
 
@@ -418,10 +418,10 @@
       <div class="inactive-pool-header">
         <div class="text-subtitle-2 text-medium-emphasis d-flex align-center">
           <v-icon size="small" class="mr-1" color="grey">mdi-archive-outline</v-icon>
-          备用资源池
+          {{ t('orchestration.standbyPool') }}
           <v-chip size="x-small" class="ml-2">{{ filteredInactiveChannels.length }}</v-chip>
         </div>
-        <span class="text-caption text-medium-emphasis">启用后将追加到活跃序列末尾</span>
+        <span class="text-caption text-medium-emphasis">{{ t('orchestration.appendToFailover') }}</span>
       </div>
 
       <div v-if="filteredInactiveChannels.length > 0" class="inactive-pool">
@@ -456,7 +456,7 @@
           <div class="channel-actions">
             <v-btn size="small" color="success" variant="tonal" @click="enableChannel(channel.index)">
               <v-icon start size="small">mdi-play-circle</v-icon>
-              启用
+              {{ t('orchestration.enable') }}
             </v-btn>
 
             <v-menu>
@@ -478,32 +478,32 @@
                   <template #prepend>
                     <v-icon size="small">mdi-pencil</v-icon>
                   </template>
-                  <v-list-item-title>编辑</v-list-item-title>
+                  <v-list-item-title>{{ t('orchestration.edit') }}</v-list-item-title>
                 </v-list-item>
                 <v-list-item @click="$emit('testCapability', channel.index)">
                   <template #prepend>
                     <v-icon size="small" color="success">mdi-test-tube</v-icon>
                   </template>
-                  <v-list-item-title>能力测试</v-list-item-title>
+                  <v-list-item-title>{{ t('addChannel.testCapability') }}</v-list-item-title>
                 </v-list-item>
                 <v-list-item @click="copyChannelInfo(channel)">
                   <template #prepend>
                     <v-icon size="small">mdi-content-copy</v-icon>
                   </template>
-                  <v-list-item-title>复制配置</v-list-item-title>
+                  <v-list-item-title>{{ t('orchestration.copyConfig') }}</v-list-item-title>
                 </v-list-item>
                 <v-divider />
                 <v-list-item @click="enableChannel(channel.index)">
                   <template #prepend>
                     <v-icon size="small" color="success">mdi-play-circle</v-icon>
                   </template>
-                  <v-list-item-title>启用</v-list-item-title>
+                  <v-list-item-title>{{ t('orchestration.enable') }}</v-list-item-title>
                 </v-list-item>
                 <v-list-item @click="$emit('delete', channel.index)">
                   <template #prepend>
                     <v-icon size="small" color="error">mdi-delete</v-icon>
                   </template>
-                  <v-list-item-title>删除</v-list-item-title>
+                  <v-list-item-title>{{ t('orchestration.delete') }}</v-list-item-title>
                 </v-list-item>
               </v-list>
             </v-menu>
@@ -511,8 +511,8 @@
         </div>
       </div>
 
-      <div v-else-if="isSearchActive && inactiveChannels.length > 0" class="text-center py-4 text-medium-emphasis text-caption">无匹配的备用渠道</div>
-      <div v-else class="text-center py-4 text-medium-emphasis text-caption">所有渠道都处于活跃状态</div>
+      <div v-else-if="isSearchActive && inactiveChannels.length > 0" class="text-center py-4 text-medium-emphasis text-caption">{{ t('orchestration.noMatchingStandby') }}</div>
+      <div v-else class="text-center py-4 text-medium-emphasis text-caption">{{ t('orchestration.allActive') }}</div>
     </div>
     <!-- 渠道日志对话框 -->
     <ChannelLogsDialog
@@ -528,6 +528,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import draggable from 'vuedraggable'
 import { api, type Channel, type ChannelMetrics, type ChannelStatus, type TimeWindowStats, type ChannelRecentActivity, expandSparseSegments } from '../services/api'
+import { useI18n } from '../i18n'
 import ChannelStatusBadge from './ChannelStatusBadge.vue'
 // 异步加载图表组件，减少首屏 JS 体积
 const KeyTrendChart = defineAsyncComponent(() => import('./KeyTrendChart.vue'))
@@ -561,6 +562,7 @@ const emit = defineEmits<{
   (_e: 'error', _message: string): void
   (_e: 'success', _message: string): void
 }>()
+const { t } = useI18n()
 
 // 状态
 const metrics = ref<ChannelMetrics[]>([])
@@ -660,7 +662,7 @@ const copyChannelInfo = async (channel: Channel) => {
     await navigator.clipboard.writeText(content)
     setSuccessState()
   } catch (err) {
-    console.error('复制渠道配置失败:', err)
+    console.error(t('orchestration.copyFailed'), err)
     // 降级方案：使用传统的复制方法
     const textArea = document.createElement('textarea')
     textArea.value = content
@@ -675,7 +677,7 @@ const copyChannelInfo = async (channel: Channel) => {
       document.execCommand('copy')
       setSuccessState()
     } catch (copyErr) {
-      console.error('降级复制方案也失败:', copyErr)
+      console.error(t('orchestration.copyFailed'), copyErr)
     } finally {
       textArea.remove()
     }
@@ -833,14 +835,14 @@ const formatPromotionRemaining = (until?: string): string => {
   if (!until) return ''
   const remaining = Math.max(0, new Date(until).getTime() - Date.now())
   const minutes = Math.ceil(remaining / 60000)
-  if (minutes <= 0) return '即将结束'
-  return `${minutes}分钟`
+  if (minutes <= 0) return t('orchestration.endingSoon')
+  return t('orchestration.minutesRemaining', { count: minutes })
 }
 
 // 格式化统计数据：有请求显示"N 请求 (X%)"，无请求显示"--"
 const formatStats = (stats?: TimeWindowStats): string => {
   if (!stats || !stats.requestCount) return '--'
-  return `${stats.requestCount} 请求 (${stats.successRate?.toFixed(0)}%)`
+  return `${stats.requestCount} ${t('orchestration.requests')} (${stats.successRate?.toFixed(0)}%)`
 }
 
 const formatTokens = (num?: number): string => {
@@ -861,7 +863,7 @@ const formatCacheStats = (stats?: TimeWindowStats): string => {
   if (denom <= 0) return '--'
 
   const hitRate = stats.cacheHitRate ?? (cacheReadTokens / denom * 100)
-  return `命中 ${hitRate.toFixed(0)}% · 读 ${formatTokens(cacheReadTokens)} · 写 ${formatTokens(cacheCreationTokens)}`
+  return `${t('orchestration.hitRate')} ${hitRate.toFixed(0)}% · ${t('orchestration.read')} ${formatTokens(cacheReadTokens)} · ${t('orchestration.write')} ${formatTokens(cacheCreationTokens)}`
 }
 
 // 获取官网 URL（优先使用 website，否则从 baseUrl 提取域名）
@@ -1263,8 +1265,8 @@ const saveOrder = async () => {
     // 不调用 emit('refresh')，避免触发父组件刷新导致列表闪烁
   } catch (error) {
     console.error('Failed to save order:', error)
-    const errorMessage = error instanceof Error ? error.message : '未知错误'
-    emit('error', `保存渠道顺序失败: ${errorMessage}`)
+    const errorMessage = error instanceof Error ? error.message : t('addChannel.unknownError')
+    emit('error', t('toast.operationFailed', { message: errorMessage }))
     // 保存失败时重新初始化列表，恢复原始顺序
     initActiveChannels()
   } finally {
@@ -1309,8 +1311,8 @@ const setChannelStatus = async (channelId: number, status: ChannelStatus) => {
     emit('refresh')
   } catch (error) {
     console.error('Failed to set channel status:', error)
-    const errorMessage = error instanceof Error ? error.message : '未知错误'
-    emit('error', `设置渠道状态失败: ${errorMessage}`)
+    const errorMessage = error instanceof Error ? error.message : t('addChannel.unknownError')
+    emit('error', t('toast.operationFailed', { message: errorMessage }))
   }
 }
 
@@ -1367,11 +1369,11 @@ const setPromotion = async (channel: Channel) => {
     }
     emit('refresh')
     // 通知用户
-    emit('success', `渠道 ${channel.name} 已设为最高优先级，5分钟内优先使用`)
+    emit('success', t('orchestration.promotionSuccess', { name: channel.name }))
   } catch (error) {
     console.error('Failed to set promotion:', error)
-    const errorMessage = error instanceof Error ? error.message : '未知错误'
-    emit('error', `设置优先级失败: ${errorMessage}`)
+    const errorMessage = error instanceof Error ? error.message : t('addChannel.unknownError')
+    emit('error', t('toast.operationFailed', { message: errorMessage }))
   }
 }
 
@@ -1395,7 +1397,7 @@ const canDeleteChannel = (channel: Channel): boolean => {
 // 处理删除渠道
 const handleDeleteChannel = (channel: Channel) => {
   if (!canDeleteChannel(channel)) {
-    emit('error', '无法删除：故障转移序列中至少需要保留一个活跃渠道')
+    emit('error', t('orchestration.deleteActiveGuard'))
     return
   }
   emit('delete', channel.index)

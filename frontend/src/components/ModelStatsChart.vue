@@ -3,7 +3,7 @@
     <v-snackbar v-model="showError" color="error" :timeout="3000" location="top">
       {{ errorMessage }}
       <template #actions>
-        <v-btn variant="text" @click="showError = false">关闭</v-btn>
+        <v-btn variant="text" @click="showError = false">{{ t('chart.close') }}</v-btn>
       </template>
     </v-snackbar>
 
@@ -11,10 +11,10 @@
     <div class="chart-header d-flex align-center justify-space-between mb-3 flex-wrap ga-2">
       <div class="d-flex align-center ga-2">
         <v-btn-toggle v-model="selectedDuration" mandatory density="compact" variant="outlined" divided :disabled="isLoading">
-          <v-btn value="1h" size="x-small">1小时</v-btn>
-          <v-btn value="6h" size="x-small">6小时</v-btn>
-          <v-btn value="24h" size="x-small">24小时</v-btn>
-          <v-btn value="today" size="x-small">今日</v-btn>
+          <v-btn value="1h" size="x-small">{{ t('chart.1h') }}</v-btn>
+          <v-btn value="6h" size="x-small">{{ t('chart.6h') }}</v-btn>
+          <v-btn value="24h" size="x-small">{{ t('chart.24h') }}</v-btn>
+          <v-btn value="today" size="x-small">{{ t('chart.today') }}</v-btn>
         </v-btn-toggle>
         <v-btn icon size="x-small" variant="text" :loading="isLoading" :disabled="isLoading" @click="refreshData()">
           <v-icon size="small">mdi-refresh</v-icon>
@@ -23,7 +23,7 @@
       <v-btn-toggle v-model="selectedView" mandatory density="compact" variant="outlined" divided :disabled="isLoading">
         <v-btn value="requests" size="x-small">
           <v-icon size="small" class="mr-1">mdi-chart-line</v-icon>
-          请求
+          {{ t('chart.traffic') }}
         </v-btn>
         <v-btn value="tokens" size="x-small">
           <v-icon size="small" class="mr-1">mdi-chart-areaspline</v-icon>
@@ -36,7 +36,7 @@
     <div v-if="topModels.length" class="compact-summary d-flex align-center ga-3 mb-2 text-caption flex-wrap">
       <span v-for="(m, i) in topModels" :key="m.name">
         <span :style="{ color: modelColors[i % modelColors.length] }">●</span>
-        <strong>{{ m.name }}</strong> {{ formatNumber(m.count) }}次
+        <strong>{{ m.name }}</strong> {{ formatNumber(m.count) }} {{ t('chart.requestUnit') }}
       </span>
     </div>
 
@@ -48,7 +48,7 @@
     <!-- Empty -->
     <div v-else-if="!hasData" class="d-flex flex-column justify-center align-center text-medium-emphasis" style="height: 200px">
       <v-icon size="40" color="grey-lighten-1">mdi-chart-timeline-variant</v-icon>
-      <div class="text-caption mt-2">选定时间范围内没有模型请求记录</div>
+      <div class="text-caption mt-2">{{ t('chart.noModelRequestsInRange') }}</div>
     </div>
 
     <!-- Chart -->
@@ -64,6 +64,7 @@ import { useTheme } from 'vuetify'
 import VueApexCharts from 'vue3-apexcharts'
 import type { ApexOptions } from 'apexcharts'
 import { api, type ModelStatsHistoryResponse } from '../services/api'
+import { useI18n } from '../i18n'
 
 const apexchart = VueApexCharts
 
@@ -76,6 +77,7 @@ type ViewMode = 'requests' | 'tokens'
 
 const theme = useTheme()
 const isDark = computed(() => theme.global.current.value.dark)
+const { t } = useI18n()
 
 // 持久化偏好
 const storageKey = (key: string) => `modelStats:${props.apiType}:${key}`
@@ -171,7 +173,9 @@ const chartOptions = computed<ApexOptions>(() => ({
   tooltip: {
     x: { format: 'MM-dd HH:mm' },
     y: {
-      formatter: (val: number) => selectedView.value === 'requests' ? `${Math.round(val)} 请求` : formatNumber(val)
+      formatter: (val: number) => selectedView.value === 'requests'
+        ? `${Math.round(val)} ${t('chart.requestUnit')}`
+        : formatNumber(val)
     }
   },
   legend: {
@@ -196,7 +200,7 @@ const refreshData = async (silent = false) => {
   } catch (e) {
     if (currentVersion === requestVersion && !silent) {
       console.error('Failed to fetch model stats:', e)
-      errorMessage.value = e instanceof Error ? e.message : '获取模型统计数据失败'
+      errorMessage.value = e instanceof Error ? e.message : t('chart.modelStatsLoadFailed')
       showError.value = true
       historyData.value = null
     }

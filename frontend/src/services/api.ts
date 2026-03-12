@@ -1,5 +1,7 @@
 // API服务模块
+import { normalizeLocale, translate } from '@/i18n/core'
 import { useAuthStore } from '@/stores/auth'
+import { usePreferencesStore } from '@/stores/preferences'
 
 export class ApiError extends Error {
   readonly status: number
@@ -410,6 +412,11 @@ export async function fetchUpstreamModels(
 }
 
 export class ApiService {
+  private t(key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]): string {
+    const preferencesStore = usePreferencesStore()
+    return translate(normalizeLocale(preferencesStore.uiLanguage), key, params)
+  }
+
   // 获取当前 API Key（从 AuthStore）
   private getApiKey(): string | null {
     const authStore = useAuthStore()
@@ -463,7 +470,7 @@ export class ApiService {
         if (import.meta.env.DEV) {
           console.warn('🔒 认证失败 - 时间:', new Date().toISOString())
         }
-        throw new ApiError('认证失败，请重新输入访问密钥', response.status, errorBody)
+        throw new ApiError(this.t('service.authFailed'), response.status, errorBody)
       }
 
       throw new ApiError(errorMessage, response.status, errorBody)
