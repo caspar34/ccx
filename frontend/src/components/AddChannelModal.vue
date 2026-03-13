@@ -634,6 +634,23 @@
               </div>
             </v-col>
 
+            <!-- 能力测试 RPM -->
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model.number="form.rpm"
+                :label="t('addChannel.rpmLabel')"
+                :hint="t('addChannel.rpmHint')"
+                persistent-hint
+                type="number"
+                min="1"
+                step="1"
+                variant="outlined"
+                density="comfortable"
+                prepend-inner-icon="mdi-speedometer"
+                @blur="form.rpm = form.rpm > 0 ? Math.floor(form.rpm) : 10"
+              />
+            </v-col>
+
             <!-- 注入 Dummy Thought Signature（仅 Gemini 渠道显示） -->
             <v-col v-if="props.channelType === 'gemini'" cols="12">
               <div class="d-flex align-center justify-space-between">
@@ -1070,7 +1087,8 @@ const handleQuickSubmit = () => {
     baseUrl: detectedBaseUrl.value,
     baseUrls: detectedBaseUrls.value,
     apiKeys: detectedApiKeys.value,
-    modelMapping: {}
+    modelMapping: {},
+    rpm: 10
   }
 
   // 传递 isQuickAdd 标志，让 App.vue 知道需要进行后续处理
@@ -1324,7 +1342,8 @@ const form = reactive({
   fastMode: false,
   customHeaders: {} as Record<string, string>,
   proxyUrl: '',
-  supportedModels: [] as string[]
+  supportedModels: [] as string[],
+  rpm: 10
 })
 
 // 多 BaseURL 文本输入（独立变量，保留用户输入的换行）
@@ -1556,6 +1575,7 @@ const resetForm = () => {
   form.customHeaders = {}
   form.proxyUrl = ''
   form.supportedModels = []
+  form.rpm = 10
   newApiKey.value = ''
   newMapping.source = ''
   newMapping.target = ''
@@ -1625,6 +1645,7 @@ const loadChannelData = (channel: Channel) => {
   form.customHeaders = { ...(channel.customHeaders || {}) }
   form.proxyUrl = channel.proxyUrl || ''
   form.supportedModels = channel.supportedModels || []
+  form.rpm = channel.rpm ?? 10
 
   // 立即同步 baseUrl 到预览变量，避免等待 debounce
   formBaseUrlPreview.value = channel.baseUrl

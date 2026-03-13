@@ -66,6 +66,13 @@ export type MessageKey =
   | 'capability.convert'
   | 'capability.totalDuration'
   | 'capability.channelFallback'
+  | 'capability.progressSummary'
+  | 'capability.protocolRunning'
+  | 'capability.modelStatus'
+  | 'capability.modelQueued'
+  | 'capability.modelRunning'
+  | 'capability.modelSuccess'
+  | 'capability.modelFailed'
   | 'orchestration.title'
   | 'orchestration.multiChannel'
   | 'orchestration.singleChannel'
@@ -173,6 +180,8 @@ export type MessageKey =
   | 'addChannel.customHeadersHint'
   | 'addChannel.headerNameLabel'
   | 'addChannel.headerValueLabel'
+  | 'addChannel.rpmLabel'
+  | 'addChannel.rpmHint'
   | 'addChannel.proxyUrlLabel'
   | 'addChannel.proxyUrlPlaceholder'
   | 'addChannel.proxyUrlHint'
@@ -378,6 +387,13 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'capability.convert': '{protocol} convert',
     'capability.totalDuration': 'Total duration: {duration}ms',
     'capability.channelFallback': 'Channel #{id}',
+    'capability.progressSummary': '{done}/{total} models finished',
+    'capability.protocolRunning': 'Running',
+    'capability.modelStatus': 'Status',
+    'capability.modelQueued': 'Queued',
+    'capability.modelRunning': 'Running',
+    'capability.modelSuccess': 'Available',
+    'capability.modelFailed': 'Failed',
     'orchestration.title': 'Channel orchestration',
     'orchestration.multiChannel': 'Multi-channel mode',
     'orchestration.singleChannel': 'Single-channel mode',
@@ -485,6 +501,8 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'addChannel.customHeadersHint': 'Add or override HTTP headers sent to the upstream service.',
     'addChannel.headerNameLabel': 'Header name',
     'addChannel.headerValueLabel': 'Header value',
+    'addChannel.rpmLabel': 'Capability test RPM',
+    'addChannel.rpmHint': 'Only affects capability tests; higher RPM makes tests finish faster.',
     'addChannel.proxyUrlLabel': 'Proxy URL (optional)',
     'addChannel.proxyUrlPlaceholder': 'http://127.0.0.1:7890 or socks5://127.0.0.1:1080',
     'addChannel.proxyUrlHint': 'Supports HTTP/HTTPS/SOCKS5 proxy URLs for accessing upstream services through a proxy.',
@@ -689,6 +707,13 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'capability.convert': 'Konversi {protocol}',
     'capability.totalDuration': 'Total durasi: {duration}ms',
     'capability.channelFallback': 'Channel #{id}',
+    'capability.progressSummary': '{done}/{total} model selesai',
+    'capability.protocolRunning': 'Berjalan',
+    'capability.modelStatus': 'Status',
+    'capability.modelQueued': 'Antri',
+    'capability.modelRunning': 'Berjalan',
+    'capability.modelSuccess': 'Tersedia',
+    'capability.modelFailed': 'Gagal',
     'orchestration.title': 'Orkestrasi channel',
     'orchestration.multiChannel': 'Mode multi-channel',
     'orchestration.singleChannel': 'Mode single-channel',
@@ -796,6 +821,8 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'addChannel.customHeadersHint': 'Tambahkan atau timpa HTTP header yang dikirim ke upstream.',
     'addChannel.headerNameLabel': 'Nama header',
     'addChannel.headerValueLabel': 'Nilai header',
+    'addChannel.rpmLabel': 'RPM uji kemampuan',
+    'addChannel.rpmHint': 'Hanya memengaruhi uji kemampuan; RPM lebih tinggi membuat tes selesai lebih cepat.',
     'addChannel.proxyUrlLabel': 'Proxy URL (opsional)',
     'addChannel.proxyUrlPlaceholder': 'http://127.0.0.1:7890 atau socks5://127.0.0.1:1080',
     'addChannel.proxyUrlHint': 'Mendukung proxy HTTP/HTTPS/SOCKS5 untuk mengakses layanan upstream lewat proxy.',
@@ -1000,6 +1027,13 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'capability.convert': '{protocol} 转换',
     'capability.totalDuration': '总耗时: {duration}ms',
     'capability.channelFallback': '渠道 #{id}',
+    'capability.progressSummary': '{done}/{total} 已完成',
+    'capability.protocolRunning': '测试中',
+    'capability.modelStatus': '状态',
+    'capability.modelQueued': '排队中',
+    'capability.modelRunning': '测试中',
+    'capability.modelSuccess': '可用',
+    'capability.modelFailed': '失败',
     'orchestration.title': '渠道编排',
     'orchestration.multiChannel': '多渠道模式',
     'orchestration.singleChannel': '单渠道模式',
@@ -1107,6 +1141,8 @@ export const messages: Record<SupportedLocale, Record<MessageKey, string>> = {
     'addChannel.customHeadersHint': '添加或覆盖发送到上游的 HTTP 请求头',
     'addChannel.headerNameLabel': 'Header 名称',
     'addChannel.headerValueLabel': 'Header 值',
+    'addChannel.rpmLabel': '能力测试 RPM',
+    'addChannel.rpmHint': '仅影响模型能力测试；RPM 越高测试完成越快。',
     'addChannel.proxyUrlLabel': '代理 URL (可选)',
     'addChannel.proxyUrlPlaceholder': 'http://127.0.0.1:7890 或 socks5://127.0.0.1:1080',
     'addChannel.proxyUrlHint': '支持 HTTP/HTTPS/SOCKS5 代理，用于通过代理访问上游服务',
