@@ -192,7 +192,7 @@ func TestChannelCapability(cfgManager *config.ConfigManager, channelKind string)
 			}
 			job := createCapabilityJobFromResponse(id, channel.Name, channelKind, channel.ServiceType, protocols, timeout, resp, false)
 			capabilityJobs.create(job)
-			c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": false})
+			c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": false, "job": job})
 			return
 		}
 
@@ -216,7 +216,7 @@ func TestChannelCapability(cfgManager *config.ConfigManager, channelKind string)
 			job, reused := capabilityJobs.getOrCreateByLookupKey(lookupKey, func() *CapabilityTestJob {
 				return createCapabilityJobFromResponse(id, channel.Name, channelKind, channel.ServiceType, protocols, timeout, *cached, true)
 			})
-			c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": reused})
+			c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": reused, "job": job})
 			return
 		}
 
@@ -225,14 +225,14 @@ func TestChannelCapability(cfgManager *config.ConfigManager, channelKind string)
 		})
 		if reused {
 			log.Printf("[CapabilityTest-Job] 复用能力测试任务 %s，渠道 %s (ID:%d, 类型:%s)", job.JobID, channel.Name, id, channel.ServiceType)
-			c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": true})
+			c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": true, "job": job})
 			return
 		}
 		log.Printf("[CapabilityTest-Job] 创建能力测试任务 %s，渠道 %s (ID:%d, 类型:%s)，协议: %v", job.JobID, channel.Name, id, channel.ServiceType, protocols)
 
 		go runCapabilityTestJob(job.JobID, channelKind, id, *channel, protocols, timeout, cacheKey, lookupKey)
 
-		c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": false})
+		c.JSON(http.StatusOK, gin.H{"jobId": job.JobID, "resumed": false, "job": job})
 		return
 	}
 }

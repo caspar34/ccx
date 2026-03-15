@@ -1,3 +1,10 @@
+## [Unreleased]
+
+### Changed
+
+- **能力测试对话框改为 prop 驱动** - CapabilityTestDialog 从 `defineExpose` + `ref.updateJob()` 命令式驱动改为 `capabilityJob` prop + `watch` 响应式驱动，消除 ref 可能为 null 导致数据丢失的问题
+- **关闭编辑渠道弹窗时自动关闭能力测试弹窗** - 避免 Vuetify dialog 叠加后 overlay 栈错乱导致关闭按钮和 ESC 失效
+
 ## [v2.6.36] - 2026-03-14
 
 ### Fixed

@@ -377,6 +377,7 @@
       v-model="showCapabilityTestDialog"
       :channel-name="capabilityTestChannelName"
       :current-tab="channelStore.activeTab"
+      :capability-job="capabilityTestJob"
       @copy-to-tab="handleCopyToTab"
     />
 
@@ -697,6 +698,13 @@ watch(showCapabilityTestDialog, (open) => {
   }
 })
 
+// 关闭编辑渠道弹窗时，同时关闭能力测试弹窗
+watch(() => dialogStore.showAddChannelModal, (open) => {
+  if (!open && showCapabilityTestDialog.value) {
+    showCapabilityTestDialog.value = false
+  }
+})
+
 const stopCapabilityTestPolling = () => {
   if (capabilityTestPolling.value) {
     clearInterval(capabilityTestPolling.value)
@@ -709,7 +717,6 @@ const updateCapabilityJob = (job: CapabilityTestJob) => {
   if (job.status === 'completed' || job.status === 'failed') {
     stopCapabilityTestPolling()
   }
-  capabilityTestDialogRef.value?.updateJob(job)
 }
 
 const testChannelCapability = async (channelId: number) => {
@@ -718,7 +725,6 @@ const testChannelCapability = async (channelId: number) => {
   capabilityTestChannelId.value = channelId
 
   showCapabilityTestDialog.value = true
-  capabilityTestDialogRef.value?.startInitializing()
   stopCapabilityTestPolling()
   capabilityTestJobId.value = ''
   capabilityTestJob.value = null
@@ -727,12 +733,13 @@ const testChannelCapability = async (channelId: number) => {
     const startResp: CapabilityTestJobStartResponse = await api.startChannelCapabilityTest(channelStore.activeTab, channelId)
     capabilityTestJobId.value = startResp.jobId
 
-    // 立即获取初始状态并切换到结果页（所有模型显示 queued）
-    const initial = await api.getChannelCapabilityTestStatus(channelStore.activeTab, channelId, startResp.jobId)
-    updateCapabilityJob(initial)
+    // 后端返回时已带完整 job（含各协议模型列表），直接展示
+    if (startResp.job) {
+      updateCapabilityJob(startResp.job)
+    }
 
-    // 缓存命中时任务已完成，无需轮询
-    if (initial.status === 'completed' || initial.status === 'failed') {
+    // 缓存命中或已完成，无需轮询
+    if (startResp.job?.status === 'completed' || startResp.job?.status === 'failed') {
       return
     }
 

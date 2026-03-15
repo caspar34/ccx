@@ -158,6 +158,7 @@ func newCapabilityTestJob(channelID int, channelName, channelKind, sourceType st
 		ChannelKind:         channelKind,
 		SourceType:          sourceType,
 		Status:              CapabilityJobStatusQueued,
+		CompatibleProtocols: make([]string, 0),
 		Tests:               make([]CapabilityProtocolJobResult, 0, len(protocols)),
 		UpdatedAt:           now,
 		TargetProtocols:     append([]string(nil), protocols...),
@@ -165,10 +166,23 @@ func newCapabilityTestJob(channelID int, channelName, channelKind, sourceType st
 	}
 
 	for _, protocol := range protocols {
+		// 预填充各协议的模型列表（全部 queued），前端可立即展示
+		var modelResults []CapabilityModelJobResult
+		if models, err := getCapabilityProbeModels(protocol); err == nil {
+			modelResults = make([]CapabilityModelJobResult, len(models))
+			for i, model := range models {
+				modelResults[i] = CapabilityModelJobResult{
+					Model:  model,
+					Status: CapabilityModelStatusQueued,
+				}
+			}
+		}
 		job.Tests = append(job.Tests, CapabilityProtocolJobResult{
-			Protocol: protocol,
-			Status:   CapabilityProtocolStatusQueued,
-			TestedAt: now,
+			Protocol:        protocol,
+			Status:          CapabilityProtocolStatusQueued,
+			AttemptedModels: len(modelResults),
+			ModelResults:    modelResults,
+			TestedAt:        now,
 		})
 	}
 

@@ -148,6 +148,7 @@ export interface PingResult {
 export interface CapabilityTestJobStartResponse {
   jobId: string
   resumed?: boolean
+  job?: CapabilityTestJob
 }
 
 export type CapabilityTestJobStatus = 'queued' | 'running' | 'completed' | 'failed'

@@ -36,7 +36,7 @@
             <div class="text-body-2 font-weight-medium mb-2">{{ t('capability.compatibleProtocols') }}</div>
             <div class="d-flex flex-wrap ga-2">
               <v-chip
-                v-for="proto in job.compatibleProtocols"
+                v-for="proto in (job.compatibleProtocols ?? [])"
                 :key="proto"
                 :color="getProtocolColor(proto)"
                 size="small"
@@ -45,8 +45,12 @@
                 <v-icon start size="small">{{ getProtocolIcon(proto) }}</v-icon>
                 {{ getProtocolDisplayName(proto) }}
               </v-chip>
-              <v-chip v-if="job.compatibleProtocols.length === 0" color="grey" size="small" variant="tonal">
+              <v-chip v-if="(job.compatibleProtocols ?? []).length === 0 && state === 'completed'" color="grey" size="small" variant="tonal">
                 {{ t('capability.noCompatibleProtocols') }}
+              </v-chip>
+              <v-chip v-else-if="(job.compatibleProtocols ?? []).length === 0" color="grey" size="small" variant="tonal" class="d-flex align-center ga-2">
+                <v-progress-circular indeterminate size="12" width="2" color="primary" />
+                <span>{{ job.status === 'queued' ? t('capability.modelQueued') : t('capability.protocolRunning') }}</span>
               </v-chip>
             </div>
           </div>
@@ -65,6 +69,10 @@
                 <div v-if="test.status === 'running'" class="d-flex align-center ga-1">
                   <v-icon color="info" size="small">mdi-progress-clock</v-icon>
                   <span class="text-body-2 text-info">{{ t('capability.protocolRunning') }}</span>
+                </div>
+                <div v-else-if="test.status === 'queued'" class="d-flex align-center ga-1">
+                  <v-icon color="grey" size="small">mdi-timer-sand</v-icon>
+                  <span class="text-body-2 text-medium-emphasis">{{ t('capability.modelQueued') }}</span>
                 </div>
                 <div v-else-if="test.success" class="d-flex align-center ga-1">
                   <v-icon color="success" size="small">mdi-check-circle</v-icon>
@@ -87,7 +95,7 @@
                     v-for="modelResult in getModelResults(test)"
                     :key="`${test.protocol}-${modelResult.model}`"
                     location="top"
-                    :content-class="modelResult.success ? 'success-tooltip' : 'failure-tooltip'"
+                    :content-class="getTooltipClass(modelResult)"
                   >
                     <template #activator="{ props }">
                       <div
@@ -110,6 +118,13 @@
                         <span class="tooltip-label">{{ t('capability.tooltipStreaming') }}</span>
                         <span class="tooltip-value">{{ formatStreaming(modelResult) }}</span>
                       </div>
+                      <div class="tooltip-row">
+                        <span class="tooltip-label">{{ t('capability.modelStatus') }}</span>
+                        <span class="tooltip-value">{{ getModelStatusLabel(modelResult.status) }}</span>
+                      </div>
+                    </div>
+                    <div v-else-if="isModelPending(modelResult)" class="tooltip-content">
+                      <div class="tooltip-title">{{ modelResult.model }}</div>
                       <div class="tooltip-row">
                         <span class="tooltip-label">{{ t('capability.modelStatus') }}</span>
                         <span class="tooltip-value">{{ getModelStatusLabel(modelResult.status) }}</span>
@@ -154,6 +169,10 @@
                       <v-icon color="info" size="small">mdi-progress-clock</v-icon>
                       <span class="text-body-2 text-info">{{ t('capability.protocolRunning') }}</span>
                     </div>
+                    <div v-else-if="test.status === 'queued'" class="d-flex align-center ga-1">
+                      <v-icon color="grey" size="small">mdi-timer-sand</v-icon>
+                      <span class="text-body-2 text-medium-emphasis">{{ t('capability.modelQueued') }}</span>
+                    </div>
                     <div v-else-if="test.success" class="d-flex align-center ga-1">
                       <v-icon color="success" size="small">mdi-check-circle</v-icon>
                       <span class="text-body-2 text-success">{{ t('capability.success') }}</span>
@@ -174,7 +193,7 @@
                   </td>
                   <td>
                     <span v-if="hasProtocolLatency(test)" class="latency-value">
-                      <span class="latency-number">{{ test.latency }}</span>
+                      <span class="latency-number">{{ getAverageLatency(test) }}</span>
                       <span class="latency-unit">ms</span>
                     </span>
                     <span v-else class="text-body-2 text-medium-emphasis">-</span>
@@ -223,7 +242,11 @@
                 <tr>
                   <td colspan="6" class="model-results-cell">
                     <div class="model-results-wrapper">
-                      <div v-if="getModelResults(test).length === 0" class="text-body-2 text-medium-emphasis py-2">
+                      <div v-if="getModelResults(test).length === 0 && (test.status === 'queued' || test.status === 'running')" class="d-flex align-center ga-2 py-2">
+                        <v-progress-circular indeterminate size="16" width="2" color="primary" />
+                        <span class="text-body-2 text-medium-emphasis">{{ test.status === 'queued' ? t('capability.modelQueued') : t('capability.protocolRunning') }}</span>
+                      </div>
+                      <div v-else-if="getModelResults(test).length === 0" class="text-body-2 text-medium-emphasis py-2">
                         {{ t('capability.modelDetailsUnavailable') }}
                       </div>
 
@@ -234,7 +257,7 @@
                             v-for="modelResult in getModelResults(test)"
                             :key="`${test.protocol}-${modelResult.model}`"
                             location="top"
-                            :content-class="modelResult.success ? 'success-tooltip' : 'failure-tooltip'"
+                            :content-class="getTooltipClass(modelResult)"
                           >
                             <template #activator="{ props }">
                               <div
@@ -257,6 +280,13 @@
                                 <span class="tooltip-label">{{ t('capability.tooltipStreaming') }}</span>
                                 <span class="tooltip-value">{{ formatStreaming(modelResult) }}</span>
                               </div>
+                              <div class="tooltip-row">
+                                <span class="tooltip-label">{{ t('capability.modelStatus') }}</span>
+                                <span class="tooltip-value">{{ getModelStatusLabel(modelResult.status) }}</span>
+                              </div>
+                            </div>
+                            <div v-else-if="isModelPending(modelResult)" class="tooltip-content">
+                              <div class="tooltip-title">{{ modelResult.model }}</div>
                               <div class="tooltip-row">
                                 <span class="tooltip-label">{{ t('capability.modelStatus') }}</span>
                                 <span class="tooltip-value">{{ getModelStatusLabel(modelResult.status) }}</span>
@@ -290,7 +320,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type {
   CapabilityTestJob,
   CapabilityProtocolJobResult,
@@ -303,9 +333,10 @@ interface Props {
   modelValue: boolean
   channelName: string
   currentTab: string
+  capabilityJob: CapabilityTestJob | null
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 defineEmits<{
   'update:modelValue': [value: boolean]
   'copyToTab': [protocol: string]
@@ -313,9 +344,28 @@ defineEmits<{
 
 const { t } = useI18n()
 
-const state = ref<'initializing' | 'running' | 'error' | 'completed'>('initializing')
-const job = ref<CapabilityTestJob | null>(null)
 const errorMessage = ref('')
+
+watch(() => props.modelValue, (open) => {
+  if (open) {
+    errorMessage.value = ''
+  }
+})
+
+watch(() => props.capabilityJob?.jobId ?? '', (nextJobId, prevJobId) => {
+  if (nextJobId !== prevJobId) {
+    errorMessage.value = ''
+  }
+})
+
+const state = computed(() => {
+  if (errorMessage.value) return 'error'
+  if (!props.capabilityJob) return 'initializing'
+  if (props.capabilityJob.status === 'completed' || props.capabilityJob.status === 'failed') return 'completed'
+  return 'running'
+})
+
+const job = computed(() => props.capabilityJob)
 
 const getProtocolDisplayName = (protocol: string) => {
   const map: Record<string, string> = {
@@ -393,8 +443,15 @@ const formatSuccessRatio = (test: CapabilityProtocolJobResult): string => {
   return `${getSuccessCount(test)}/${attemptedModels}`
 }
 
+const getAverageLatency = (test: CapabilityProtocolJobResult): number => {
+  const successModels = getModelResults(test).filter(m => m.success && typeof m.latency === 'number' && m.latency >= 0)
+  if (successModels.length === 0) return -1
+  const total = successModels.reduce((sum, m) => sum + m.latency, 0)
+  return Math.round(total / successModels.length)
+}
+
 const hasProtocolLatency = (test: CapabilityProtocolJobResult): boolean => {
-  return typeof test.latency === 'number' && test.latency >= 0
+  return getAverageLatency(test) >= 0
 }
 
 const formatLatency = (latency: number): string => {
@@ -412,25 +469,18 @@ const formatTime = (value: string): string => {
   return date.toLocaleTimeString()
 }
 
-const startInitializing = () => {
-  state.value = 'initializing'
-  job.value = null
-  errorMessage.value = ''
-}
-
-const updateJob = (nextJob: CapabilityTestJob) => {
-  job.value = nextJob
-  if (nextJob.status === 'completed' || nextJob.status === 'failed') {
-    // 无论成功或失败，都展示详细结果（不跳转到 error 页面）
-    state.value = 'completed'
-  } else {
-    state.value = 'running'
-  }
-}
-
 const setError = (error: string) => {
   errorMessage.value = error
-  state.value = 'error'
+}
+
+const isModelPending = (modelResult: CapabilityModelJobResult): boolean => {
+  return modelResult.status === 'queued' || modelResult.status === 'running'
+}
+
+const getTooltipClass = (modelResult: CapabilityModelJobResult): string => {
+  if (modelResult.success) return 'success-tooltip'
+  if (isModelPending(modelResult)) return ''
+  return 'failure-tooltip'
 }
 
 const getModelStatusLabel = (status: CapabilityModelJobStatus) => {
@@ -444,7 +494,7 @@ const getModelStatusLabel = (status: CapabilityModelJobStatus) => {
   }
 }
 
-defineExpose({ startInitializing, updateJob, setError })
+defineExpose({ setError })
 </script>
 
 <style scoped>
