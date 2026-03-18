@@ -94,6 +94,7 @@ func (p *ResponsesProvider) buildProviderRequestBody(requestPath string, bodyByt
 		if err := json.Unmarshal(bodyBytes, &reqMap); err != nil {
 			return nil, nil, fmt.Errorf("透传模式下解析请求失败: %w", err)
 		}
+		normalizeResponsesInputForPassthrough(reqMap)
 		if model, ok := reqMap["model"].(string); ok {
 			reqMap["model"] = config.RedirectModel(model, upstream)
 			if effort := config.ResolveReasoningEffort(model, upstream); effort != "" {
@@ -563,4 +564,36 @@ func toString(v interface{}) string {
 		return s
 	}
 	return ""
+}
+
+func normalizeResponsesInputForPassthrough(reqMap map[string]interface{}) {
+	input, ok := reqMap["input"].([]interface{})
+	if !ok {
+		return
+	}
+
+	for _, rawItem := range input {
+		item, ok := rawItem.(map[string]interface{})
+		if !ok || toString(item["type"]) != "message" {
+			continue
+		}
+
+		role := normalizeRole(toString(item["role"]))
+		targetTextType := responsesTextContentType(role)
+		content, ok := item["content"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, rawBlock := range content {
+			block, ok := rawBlock.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			blockType := toString(block["type"])
+			if blockType == "input_text" || blockType == "output_text" {
+				block["type"] = targetTextType
+			}
+		}
+	}
 }

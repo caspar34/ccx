@@ -94,6 +94,7 @@ func TestClassifyMessage(t *testing.T) {
 		// 不应 failover
 		{"normal error", "Something went wrong", false, false},
 		{"validation error", "Field 'name' is required", false, false},
+		{"schema invalid value", "Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.", false, false},
 		{"empty message", "", false, false},
 	}
 
@@ -212,6 +213,17 @@ func TestClassifyByErrorMessage(t *testing.T) {
 				"error": map[string]interface{}{
 					"message": "Bad request format",
 					"type":    "invalid_request",
+				},
+			},
+			wantFailover: false,
+			wantQuota:    false,
+		},
+		{
+			name: "schema invalid value in message",
+			body: map[string]interface{}{
+				"error": map[string]interface{}{
+					"message": "Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.",
+					"type":    "invalid_request_error",
 				},
 			},
 			wantFailover: false,
@@ -439,6 +451,18 @@ func TestShouldRetryWithNextKey(t *testing.T) {
 			wantFailover: false,
 			wantQuota:    false,
 		},
+		{
+			name:       "400 invalid_request_error should not failover",
+			statusCode: 400,
+			body: map[string]interface{}{
+				"error": map[string]interface{}{
+					"type":    "invalid_request_error",
+					"message": "Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.",
+				},
+			},
+			wantFailover: false,
+			wantQuota:    false,
+		},
 		// 404 不应 failover
 		{
 			name:         "404 never failover",
@@ -640,6 +664,34 @@ func TestShouldRetryWithNextKey_FuzzyMode_403WithQuotaMessage(t *testing.T) {
 			}
 			if gotQuota != tt.wantQuota {
 				t.Errorf("ShouldRetryWithNextKey(%d, body, true) quota = %v, want %v", tt.statusCode, gotQuota, tt.wantQuota)
+			}
+		})
+	}
+}
+
+func TestShouldRetryWithNextKey_FuzzyMode_InvalidRequestShouldNotFailover(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "invalid_request_error type",
+			body: []byte(`{"error":{"type":"invalid_request_error","message":"Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'."}}`),
+		},
+		{
+			name: "schema validation message in upstream_error",
+			body: []byte(`{"error":{"type":"upstream_error","upstream_error":{"message":"Schema validation failed: unsupported content type input_text"}}}`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFailover, gotQuota := ShouldRetryWithNextKey(400, tt.body, true, "Messages")
+			if gotFailover {
+				t.Errorf("ShouldRetryWithNextKey(400, invalid_request_body, true) failover = %v, want false", gotFailover)
+			}
+			if gotQuota {
+				t.Errorf("ShouldRetryWithNextKey(400, invalid_request_body, true) quota = %v, want false", gotQuota)
 			}
 		})
 	}

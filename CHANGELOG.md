@@ -1,3 +1,13 @@
+## [v2.6.40] - 2026-03-18
+
+### Changed
+
+- **metadata.user_id 通用 JSON 对象支持** - 扩展规范化逻辑支持任意 JSON 对象格式，优先处理 Claude Code 标准字段（`device_id/account_uuid/session_id`），对非标准格式按字母序拼接为 `key_value` 格式，确保更广泛的上游兼容性
+
+### Fixed
+
+- **修复 invalid_request 误拦截认证错误** - `isSchemaValidationError` 检查 `error.code` 排除 `invalid_api_key` 等认证错误，仅拦截真正的 schema/参数错误，保留多 key 场景下的 failover 能力
+
 ## [v2.6.39] - 2026-03-18
 
 ### Fixed

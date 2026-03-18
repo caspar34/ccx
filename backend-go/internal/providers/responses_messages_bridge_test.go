@@ -222,3 +222,57 @@ func TestResponsesProvider_ConvertToClaudeResponse(t *testing.T) {
 		t.Fatalf("usage = %#v, want input=12 output=34", claudeResp.Usage)
 	}
 }
+
+func TestResponsesProvider_BuildProviderRequestBody_NormalizesPassthroughInputTextTypes(t *testing.T) {
+	provider := &ResponsesProvider{}
+	upstream := &config.UpstreamConfig{
+		ServiceType: "responses",
+	}
+
+	body := []byte(`{
+		"model":"gpt-5",
+		"input":[
+			{"type":"message","role":"user","content":[{"type":"output_text","text":"用户消息"}]},
+			{"type":"message","role":"assistant","content":[{"type":"input_text","text":"助手消息"}]},
+			{"type":"message","role":"assistant","content":[{"type":"refusal","text":"不能回答"}]}
+		]
+	}`)
+
+	reqBody, _, err := provider.buildProviderRequestBody("/v1/responses", body, upstream)
+	if err != nil {
+		t.Fatalf("buildProviderRequestBody() err = %v", err)
+	}
+
+	reqMap, ok := reqBody.(map[string]interface{})
+	if !ok {
+		t.Fatalf("provider request type = %T, want map[string]interface{}", reqBody)
+	}
+
+	input, ok := reqMap["input"].([]interface{})
+	if !ok {
+		t.Fatalf("reqMap[input] type = %T, want []interface{}", reqMap["input"])
+	}
+
+	assertContentType := func(index int, wantType string) {
+		t.Helper()
+		item, ok := input[index].(map[string]interface{})
+		if !ok {
+			t.Fatalf("input[%d] type = %T, want map[string]interface{}", index, input[index])
+		}
+		content, ok := item["content"].([]interface{})
+		if !ok || len(content) != 1 {
+			t.Fatalf("input[%d].content = %#v, want single block", index, item["content"])
+		}
+		block, ok := content[0].(map[string]interface{})
+		if !ok {
+			t.Fatalf("input[%d].content[0] type = %T, want map[string]interface{}", index, content[0])
+		}
+		if block["type"] != wantType {
+			t.Fatalf("input[%d].content[0].type = %v, want %s", index, block["type"], wantType)
+		}
+	}
+
+	assertContentType(0, "input_text")
+	assertContentType(1, "output_text")
+	assertContentType(2, "refusal")
+}

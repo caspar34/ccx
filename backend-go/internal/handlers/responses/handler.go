@@ -48,6 +48,9 @@ func Handler(
 			return
 		}
 
+		// 预处理：规范化 metadata.user_id（兼容 Claude Code v2.1.78+ JSON 对象格式）
+		bodyBytes = common.NormalizeMetadataUserID(bodyBytes)
+
 		// 解析 Responses 请求
 		var responsesReq types.ResponsesRequest
 		if len(bodyBytes) > 0 {

@@ -47,6 +47,9 @@ func Handler(envCfg *config.EnvConfig, cfgManager *config.ConfigManager, channel
 			bodyBytes, _ = common.RemoveBillingHeaders(bodyBytes, envCfg.EnableRequestLogs, "Messages")
 		}
 
+		// 预处理：规范化 metadata.user_id（兼容 Claude Code v2.1.78+ JSON 对象格式）
+		bodyBytes = common.NormalizeMetadataUserID(bodyBytes)
+
 		// 解析请求
 		var claudeReq types.ClaudeRequest
 		if len(bodyBytes) > 0 {

@@ -38,9 +38,9 @@ func ShouldRetryWithNextKey(statusCode int, bodyBytes []byte, fuzzyMode bool, ap
 	return shouldRetryWithNextKeyNormal(statusCode, bodyBytes, apiType)
 }
 
-// shouldRetryWithNextKeyFuzzy Fuzzy 模式：所有非 2xx 错误都尝试 failover
+// shouldRetryWithNextKeyFuzzy Fuzzy 模式：大多数非 2xx 错误都尝试 failover
 // 同时检查消息体中的配额相关关键词，确保 403 + "预扣费额度" 等情况能正确识别
-// 但对于内容审核等不可重试错误，即使在 Fuzzy 模式下也不应重试
+// 但对于内容审核、invalid_request、schema 校验失败等不可重试错误，即使在 Fuzzy 模式下也不应重试
 func shouldRetryWithNextKeyFuzzy(statusCode int, bodyBytes []byte, apiType string) (bool, bool) {
 	log.Printf("[%s-Failover-Fuzzy] 进入 Fuzzy 模式处理: statusCode=%d, bodyLen=%d", apiType, statusCode, len(bodyBytes))
 	if statusCode >= 200 && statusCode < 300 {
@@ -169,6 +169,11 @@ func classifyByErrorMessage(bodyBytes []byte, apiType string) (bool, bool) {
 		return false, false
 	}
 
+	if isSchemaValidationError(errObj) {
+		log.Printf("[%s-Failover-Debug] 检测到 schema/invalid_request 错误，不进行 failover", apiType)
+		return false, false
+	}
+
 	// 检查 error.code 字段，某些错误码不应重试（内容审核、无效请求等）
 	if errCode, ok := errObj["code"].(string); ok {
 		if isNonRetryableErrorCode(errCode) {
@@ -214,6 +219,10 @@ func classifyByErrorMessage(bodyBytes []byte, apiType string) (bool, bool) {
 // classifyMessage 基于错误消息内容分类
 func classifyMessage(msg string) (bool, bool) {
 	msgLower := strings.ToLower(msg)
+
+	if isSchemaValidationMessage(msgLower) {
+		return false, false
+	}
 
 	// 配额/余额相关关键词 (failover + quota)
 	quotaKeywords := []string{
@@ -261,6 +270,17 @@ func classifyMessage(msg string) (bool, bool) {
 func classifyErrorType(errType string) (bool, bool) {
 	typeLower := strings.ToLower(errType)
 
+	// 只拦截明确的 schema/validation 错误
+	nonRetryableTypes := []string{
+		"schema_validation_error",
+		"validation_error",
+	}
+	for _, t := range nonRetryableTypes {
+		if strings.Contains(typeLower, t) {
+			return false, false
+		}
+	}
+
 	// 配额相关的错误类型 (failover + quota)
 	quotaTypes := []string{
 		"over_quota", "quota_exceeded", "rate_limit",
@@ -295,6 +315,68 @@ func classifyErrorType(errType string) (bool, bool) {
 	}
 
 	return false, false
+}
+
+func isSchemaValidationError(errObj map[string]interface{}) bool {
+	// 先检查 error.code，排除认证相关错误（需要 failover）
+	if errCode, ok := errObj["code"].(string); ok {
+		codeLower := strings.ToLower(errCode)
+		// 认证错误应该触发 failover，不拦截
+		authCodes := []string{
+			"invalid_api_key",
+			"authentication_error",
+			"permission_denied",
+			"unauthorized",
+		}
+		for _, authCode := range authCodes {
+			if strings.Contains(codeLower, authCode) {
+				return false
+			}
+		}
+	}
+
+	// 检查消息内容
+	for _, field := range []string{"message", "upstream_error", "detail"} {
+		if msg, ok := errObj[field].(string); ok && isSchemaValidationMessage(strings.ToLower(msg)) {
+			return true
+		}
+	}
+
+	if upstreamErr, ok := errObj["upstream_error"].(map[string]interface{}); ok {
+		if msg, ok := upstreamErr["message"].(string); ok && isSchemaValidationMessage(strings.ToLower(msg)) {
+			return true
+		}
+	}
+
+	// 检查 error.type，但排除单纯的 invalid_request_error（可能是认证问题）
+	if errType, ok := errObj["type"].(string); ok {
+		typeLower := strings.ToLower(errType)
+		// schema_validation_error 明确是参数错误，拦截
+		if strings.Contains(typeLower, "schema_validation") || strings.Contains(typeLower, "validation_error") {
+			return true
+		}
+		// invalid_request_error 需要结合其他信息判断，单独出现不拦截
+	}
+
+	return false
+}
+
+func isSchemaValidationMessage(msgLower string) bool {
+	nonRetryableKeywords := []string{
+		"invalid value",
+		"supported values are",
+		"schema validation",
+		"validation failed",
+		"invalid_request",
+		"invalid request",
+		"unsupported content type",
+	}
+	for _, keyword := range nonRetryableKeywords {
+		if strings.Contains(msgLower, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 // HandleAllChannelsFailed 处理所有渠道都失败的情况
@@ -419,6 +501,9 @@ func isNonRetryableError(bodyBytes []byte) bool {
 	errObj, ok := errResp["error"].(map[string]interface{})
 	if !ok {
 		return false
+	}
+	if isSchemaValidationError(errObj) {
+		return true
 	}
 	if errCode, ok := errObj["code"].(string); ok {
 		return isNonRetryableErrorCode(errCode)

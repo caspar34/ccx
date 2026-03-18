@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -238,6 +239,89 @@ func removeEmptySignaturesInMessages(data map[string]interface{}) (bool, int) {
 	}
 
 	return modified, removedCount
+}
+
+// NormalizeMetadataUserID 规范化 metadata.user_id 字段
+// Claude Code v2.1.78 将 user_id 从扁平字符串改为 JSON 对象字符串:
+//
+//	v2.1.77: "user_{device_id}_account_{uuid}_session_{sid}"
+//	v2.1.78: '{"device_id":"...","account_uuid":"...","session_id":"..."}'
+//
+// 部分上游（如 anyrouter）对 user_id 做严格校验，不接受 JSON 对象格式。
+// 此函数检测并转换为扁平字符串格式，确保上游兼容性。
+func NormalizeMetadataUserID(bodyBytes []byte) []byte {
+	decoder := json.NewDecoder(bytes.NewReader(bodyBytes))
+	decoder.UseNumber() // 保留数字精度
+
+	var data map[string]interface{}
+	if err := decoder.Decode(&data); err != nil {
+		return bodyBytes
+	}
+
+	metadata, ok := data["metadata"].(map[string]interface{})
+	if !ok {
+		return bodyBytes
+	}
+
+	userID, ok := metadata["user_id"].(string)
+	if !ok || userID == "" {
+		return bodyBytes
+	}
+
+	// 检测是否为 JSON 对象格式
+	if !strings.HasPrefix(userID, "{") {
+		return bodyBytes
+	}
+
+	// 尝试解析为通用 JSON 对象
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(userID), &parsed); err != nil {
+		return bodyBytes
+	}
+
+	// 如果是空对象，不改写
+	if len(parsed) == 0 {
+		return bodyBytes
+	}
+
+	// 动态拼接为 key_value 格式
+	var parts []string
+	// 优先处理 Claude Code 标准字段顺序
+	if deviceID, ok := parsed["device_id"].(string); ok && deviceID != "" {
+		parts = append(parts, "user_"+deviceID)
+		if accountUUID, ok := parsed["account_uuid"].(string); ok && accountUUID != "" {
+			parts = append(parts, "account_"+accountUUID)
+		}
+		if sessionID, ok := parsed["session_id"].(string); ok && sessionID != "" {
+			parts = append(parts, "session_"+sessionID)
+		}
+	} else {
+		// 非 Claude Code 格式，按字母序拼接所有字段
+		keys := make([]string, 0, len(parsed))
+		for k := range parsed {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			if v, ok := parsed[k].(string); ok && v != "" {
+				parts = append(parts, k+"_"+v)
+			}
+		}
+	}
+
+	// 如果没有有效字段，不改写
+	if len(parts) == 0 {
+		return bodyBytes
+	}
+
+	flatUserID := strings.Join(parts, "_")
+	metadata["user_id"] = flatUserID
+
+	newBytes, err := utils.MarshalJSONNoEscape(data)
+	if err != nil {
+		return bodyBytes
+	}
+	return newBytes
 }
 
 // ExtractUserID 从请求体中提取 user_id（用于 Messages API）
